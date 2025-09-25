@@ -1,0 +1,20 @@
+{
+    "name": "leantime/data-api",
+    "description": "An API for exposing data to external applications",
+    "license": "MIT",
+    "type": "leantime-plugin",
+    "version": "1.0.0",
+    "authors": [
+        {
+            "name": "Troels Ugilt Jensen",
+            "email": "tu@aarhus.dk"
+        }
+    ],
+    "homepage": "https://github.com/ITK-Leantime/leantime-data-api",
+    "require-dev": {
+    },
+    "config": {
+    },
+    "scripts": {
+    }
+}
