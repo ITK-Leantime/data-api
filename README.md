@@ -2,6 +2,8 @@
 
 An API plugin for exposing data to external applications.
 
+Copy the plugin to the folder app/Plugins/APIData, install and enable.
+
 ## API Key
 
 To use the plugin you need an API key for leantime.
