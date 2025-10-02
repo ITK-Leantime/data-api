@@ -1,6 +1,6 @@
 <?php
 
-namespace Leantime\Plugins\DataAPI\Model;
+namespace Leantime\Plugins\APIData\Model;
 
 use Carbon\CarbonInterface;
 
@@ -14,5 +14,6 @@ readonly class TimesheetData
         public string $username,
         public ?CarbonInterface $workDate = null,
         public ?CarbonInterface $modified = null,
+        public string $kind,
     ) {}
 }

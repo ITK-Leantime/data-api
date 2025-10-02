@@ -1,25 +1,24 @@
 <?php
 
-namespace Leantime\Plugins\DataAPI\Controllers;
+namespace Leantime\Plugins\APIData\Controllers;
 
 use Leantime\Core\Controller\Controller;
-use Leantime\Plugins\DataAPI\Services\DataAPI;
-use Psy\Util\Json;
+use Leantime\Plugins\APIData\Services\APIData;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 /**
  * DataAPI Controller for DataAPI plugin.
  */
-class DataAPIController extends Controller
+class API extends Controller
 {
     private const TYPE_PROJECTS = 'projects';
     private const TYPE_MILESTONES = 'milestones';
     private const TYPE_TICKETS = 'tickets';
     private const TYPE_TIMESHEETS = 'timesheets';
 
-    private DataAPI $dataAPIService;
+    private APIData $dataAPIService;
 
-    public function init(DataAPI $dataAPIService): void
+    public function init(APIData $dataAPIService): void
     {
         $this->dataAPIService = $dataAPIService;
     }
@@ -47,16 +46,17 @@ class DataAPIController extends Controller
     private function getResults(array $input, string $type): array
     {
         $start = (int) ($input['start'] ?? 0);
-        $limit = (int) ($input['limit'] ?? 10);
+        $limit = (int) ($input['limit'] ?? 100);
         $modified = $input['modified'] ?? null;
-        $ids = $input['id'] ?? null;
-        $projectId = $input['project_id'] ?? null;
+        $ids = $input['ids'] ?? null;
+        $projectIds = $input['projectIds'] ?? null;
+        $ticketIds = $input['ticketIds'] ?? null;
 
         $results = match ($type) {
             $this::TYPE_PROJECTS => $this->dataAPIService->getProjects($start, $limit, $modified, $ids),
-            $this::TYPE_MILESTONES => $this->dataAPIService->getMilestones($start, $limit, $modified, $ids, $projectId),
-            $this::TYPE_TICKETS => $this->dataAPIService->getTickets($start, $limit, $modified, $ids, $projectId),
-            $this::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modified, $ids, $projectId),
+            $this::TYPE_MILESTONES => $this->dataAPIService->getMilestones($start, $limit, $modified, $ids, $projectIds),
+            $this::TYPE_TICKETS => $this->dataAPIService->getTickets($start, $limit, $modified, $ids, $projectIds),
+            $this::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modified, $ids, $ticketIds),
         };
 
         return [
@@ -64,8 +64,11 @@ class DataAPIController extends Controller
                 'start' => $start,
                 'limit' => $limit,
                 'modified' => $modified,
-                'id' => $ids,
+                'ids' => $ids,
+                'projectIds' => $projectIds,
+                'ticketIds' => $ticketIds,
             ],
+            'resultsCount' => count($results),
             'results' => $results,
         ];
     }

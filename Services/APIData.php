@@ -1,16 +1,16 @@
 <?php
 
-namespace Leantime\Plugins\DataAPI\Services;
+namespace Leantime\Plugins\APIData\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Leantime\Domain\Tickets\Repositories\Tickets as TicketRepository;
-use Leantime\Plugins\DataAPI\Model\MilestoneData;
-use Leantime\Plugins\DataAPI\Model\ProjectData;
-use Leantime\Plugins\DataAPI\Model\TicketData;
-use Leantime\Plugins\DataAPI\Model\TimesheetData;
+use Leantime\Plugins\APIData\Model\MilestoneData;
+use Leantime\Plugins\APIData\Model\ProjectData;
+use Leantime\Plugins\APIData\Model\TicketData;
+use Leantime\Plugins\APIData\Model\TimesheetData;
 
-class DataAPI
+class APIData
 {
     private const DATE_FORMAT = 'Y-m-d H:i:s';
 
@@ -62,7 +62,7 @@ class DataAPI
         }, $values);
     }
 
-    public function getMilestones(int $startId, int $limit, int $modifiedSinceTimestamp = null, ?array $ids = null, ?int $projectId = null): array
+    public function getMilestones(int $startId, int $limit, int $modifiedSinceTimestamp = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $qb = $this->query();
         $qb->select(["id", "headline", "projectId"]);
@@ -78,8 +78,8 @@ class DataAPI
             $qb->whereIn("ticket.id", $ids);
         }
 
-        if ($projectId !== null) {
-            $qb->where("ticket.projectId", $projectId);
+        if ($projectIds !== null) {
+            $qb->whereIn("ticket.projectId", $projectIds);
         }
 
         $qb->orderBy("id", "ASC");
@@ -96,7 +96,7 @@ class DataAPI
         }, $values);
     }
 
-    public function getTickets(int $startId, int $limit, int $modifiedSinceTimestamp = null, array $ids = null, ?int $projectId = null): array
+    public function getTickets(int $startId, int $limit, int $modifiedSinceTimestamp = null, array $ids = null, ?array $projectIds = null): array
     {
         $qb = $this->query();
         $qb->select(["ticket.id", "ticket.headline", "ticket.projectId", "ticket.status", "ticket.planHours", "ticket.hourRemaining", "ticket.tags", "ticket.dateToFinish", "ticket.editTo", "ticket.milestoneid", "ticket.modified", "user.username"]);
@@ -113,8 +113,8 @@ class DataAPI
             $qb->whereIn("ticket.id", $ids);
         }
 
-        if ($projectId !== null) {
-            $qb->where("ticket.projectId", $projectId);
+        if ($projectIds !== null) {
+            $qb->whereIn("ticket.projectId", $projectIds);
         }
 
         $qb->orderBy("id", "ASC");
@@ -137,18 +137,18 @@ class DataAPI
                 $value->planHours,
                 $value->hourRemaining,
                 // "0000-00-00 00:00:00" equals null.
-                $value->dateToFinish !== null && $value->dateToFinish !== "0000-00-00 00:00:00" ? CarbonImmutable::createFromFormat($this::DATE_FORMAT, $value->dateToFinish) : null,
-                $value->editTo !== null && $value->editTo !== "0000-00-00 00:00:00" ? CarbonImmutable::createFromFormat($this::DATE_FORMAT, $value->editTo) : null,
-                $value->modified !== null && $value->modified !== "0000-00-00 00:00:00" ? CarbonImmutable::createFromFormat($this::DATE_FORMAT, $value->modified) : null,
+                $this->getCarbonFromDatabaseValue($value->dateToFinish),
+                $this->getCarbonFromDatabaseValue($value->editTo),
+                $this->getCarbonFromDatabaseValue($value->modified),
             );
         }, $values);
     }
 
-    public function getTimesheets(int $startId, int $limit, ?int $modifiedSinceTimestamp = null, ?array $ids = null, ?int $ticketId = null): array
+    public function getTimesheets(int $startId, int $limit, ?int $modifiedSinceTimestamp = null, ?array $ids = null, ?array $ticketIds = null): array
     {
         $qb = $this->query();
         $qb->from("zp_timesheets", "timesheet");
-        $qb->select(["timesheet.id", "timesheet.description", "timesheet.hours", "timesheet.workDate", "timesheet.modified", "timesheet.ticketId", "user.username"]);
+        $qb->select(["timesheet.id", "timesheet.description", "timesheet.hours", "timesheet.workDate", "timesheet.modified", "timesheet.ticketId", "timesheet.kind", "user.username"]);
         $qb->where("timesheet.id", ">=", $startId);
         $qb->leftJoin('zp_user as user', "user.id", "=", "timesheet.userId");
 
@@ -160,11 +160,11 @@ class DataAPI
             $qb->whereIn("timesheet.id", $ids);
         }
 
-        if ($ticketId !== null) {
-            $qb->where("timesheet.ticketId", $ticketId);
+        if ($ticketIds !== null) {
+            $qb->whereIn("timesheet.ticketId", $ticketIds);
         }
 
-        $qb->orderBy("id", "ASC");
+        $qb->orderBy("timesheet.id", "ASC");
         $qb->limit($limit);
 
         $values = $qb->get()->toArray();
@@ -176,9 +176,17 @@ class DataAPI
                 $value->description,
                 $value->hours,
                 $value->username,
-                CarbonImmutable::createFromFormat(self::DATE_FORMAT, $value->workDate),
-                CarbonImmutable::createFromFormat(self::DATE_FORMAT, $value->modified),
+                $this->getCarbonFromDatabaseValue($value->workDate),
+                $this->getCarbonFromDatabaseValue($value->modified),
+                $value->kind,
             );
         }, $values);
+    }
+
+    private function getCarbonFromDatabaseValue($value): ?CarbonImmutable
+    {
+        return $value !== null && $value !== "0000-00-00 00:00:00"
+            ? CarbonImmutable::createFromFormat(self::DATE_FORMAT, $value)
+            : null;
     }
 }

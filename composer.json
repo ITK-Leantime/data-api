@@ -1,5 +1,5 @@
 {
-    "name": "leantime/data-api",
+    "name": "leantime/api-data",
     "description": "An API for exposing data to external applications",
     "license": "MIT",
     "type": "leantime-plugin",
