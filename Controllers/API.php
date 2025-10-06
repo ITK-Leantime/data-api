@@ -50,13 +50,12 @@ class API extends Controller
         $modified = $input['modified'] ?? null;
         $ids = $input['ids'] ?? null;
         $projectIds = $input['projectIds'] ?? null;
-        $ticketIds = $input['ticketIds'] ?? null;
 
         $results = match ($type) {
             $this::TYPE_PROJECTS => $this->dataAPIService->getProjects($start, $limit, $modified, $ids),
             $this::TYPE_MILESTONES => $this->dataAPIService->getMilestones($start, $limit, $modified, $ids, $projectIds),
             $this::TYPE_TICKETS => $this->dataAPIService->getTickets($start, $limit, $modified, $ids, $projectIds),
-            $this::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modified, $ids, $ticketIds),
+            $this::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modified, $ids, $projectIds),
         };
 
         return [
@@ -66,7 +65,6 @@ class API extends Controller
                 'modified' => $modified,
                 'ids' => $ids,
                 'projectIds' => $projectIds,
-                'ticketIds' => $ticketIds,
             ],
             'resultsCount' => count($results),
             'results' => $results,

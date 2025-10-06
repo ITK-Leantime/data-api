@@ -144,13 +144,14 @@ class APIData
         }, $values);
     }
 
-    public function getTimesheets(int $startId, int $limit, ?int $modifiedSinceTimestamp = null, ?array $ids = null, ?array $ticketIds = null): array
+    public function getTimesheets(int $startId, int $limit, ?int $modifiedSinceTimestamp = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $qb = $this->query();
         $qb->from("zp_timesheets", "timesheet");
-        $qb->select(["timesheet.id", "timesheet.description", "timesheet.hours", "timesheet.workDate", "timesheet.modified", "timesheet.ticketId", "timesheet.kind", "user.username"]);
+        $qb->select(["timesheet.id", "timesheet.description", "timesheet.hours", "timesheet.workDate", "timesheet.modified", "timesheet.ticketId", "timesheet.kind", "user.username", "ticket.projectId"]);
         $qb->where("timesheet.id", ">=", $startId);
         $qb->leftJoin('zp_user as user', "user.id", "=", "timesheet.userId");
+        $qb->leftJoin('zp_tickets as ticket', "ticket.id", "=", "timesheet.ticketId");
 
         if ($modifiedSinceTimestamp !== null) {
             $qb->where("timesheet.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedSinceTimestamp)->format($this::DATE_FORMAT));
@@ -160,8 +161,8 @@ class APIData
             $qb->whereIn("timesheet.id", $ids);
         }
 
-        if ($ticketIds !== null) {
-            $qb->whereIn("timesheet.ticketId", $ticketIds);
+        if ($projectIds !== null) {
+            $qb->whereIn('ticket.projectId', $projectIds);
         }
 
         $qb->orderBy("timesheet.id", "ASC");
@@ -173,6 +174,7 @@ class APIData
             return new TimesheetData(
                 $value->id,
                 $value->ticketId,
+                $value->projectId,
                 $value->description,
                 $value->hours,
                 $value->username,
