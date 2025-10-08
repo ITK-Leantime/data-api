@@ -10,7 +10,7 @@ readonly class TimesheetData
         public int $id,
         public int $ticketId,
         public int $projectId,
-        public string $description,
+        public ?string $description,
         public float $hours,
         public string $username,
         public ?CarbonInterface $workDate = null,
