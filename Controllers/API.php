@@ -11,11 +11,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
  */
 class API extends Controller
 {
-    private const TYPE_PROJECTS = 'projects';
-    private const TYPE_MILESTONES = 'milestones';
-    private const TYPE_TICKETS = 'tickets';
-    private const TYPE_TIMESHEETS = 'timesheets';
-
     private APIData $dataAPIService;
 
     public function init(APIData $dataAPIService): void
@@ -23,24 +18,58 @@ class API extends Controller
         $this->dataAPIService = $dataAPIService;
     }
 
+    public function deleted(array $input): JsonResponse
+    {
+        return new JsonResponse([
+            $this->getDeleted($input)
+        ]);
+    }
+
     public function projects(array $input): JsonResponse
     {
-        return new JsonResponse($this->getResults($input, $this::TYPE_PROJECTS));
+        return new JsonResponse($this->getResults($input, APIData::TYPE_PROJECTS));
     }
 
     public function milestones(array $input): JsonResponse
     {
-        return new JsonResponse($this->getResults($input, $this::TYPE_MILESTONES));
+        return new JsonResponse($this->getResults($input, APIData::TYPE_MILESTONES));
     }
 
     public function tickets(array $input): JsonResponse
     {
-        return new JsonResponse($this->getResults($input, $this::TYPE_TICKETS));
+        return new JsonResponse($this->getResults($input, APIData::TYPE_TICKETS));
     }
 
     public function timesheets(array $input): JsonResponse
     {
-        return new JsonResponse($this->getResults($input, $this::TYPE_TIMESHEETS));
+        return new JsonResponse($this->getResults($input, APIData::TYPE_TIMESHEETS));
+    }
+
+    private function getDeleted(array $input): array
+    {
+        $types = $input['types'];
+        $deleted = $input['deleted'] ?? null;
+
+        $deletedEntries = [];
+
+        foreach ($types as $type) {
+            $deletedEntries[$type] = $this->dataAPIService->getDeleted($type, $deleted);
+        }
+
+        return [
+            'parameters' => [
+                'types' => $types,
+            ],
+            'resultsCount' => array_reduce(
+                $types,
+                function ($carry, $type) use ($deletedEntries) {
+                    $carry[$type] = count($deletedEntries[$type]);
+                    return $carry;
+                },
+                []
+            ),
+            'results' => $deletedEntries,
+        ];
     }
 
     private function getResults(array $input, string $type): array
@@ -52,10 +81,10 @@ class API extends Controller
         $projectIds = $input['projectIds'] ?? null;
 
         $results = match ($type) {
-            $this::TYPE_PROJECTS => $this->dataAPIService->getProjects($start, $limit, $modified, $ids),
-            $this::TYPE_MILESTONES => $this->dataAPIService->getMilestones($start, $limit, $modified, $ids, $projectIds),
-            $this::TYPE_TICKETS => $this->dataAPIService->getTickets($start, $limit, $modified, $ids, $projectIds),
-            $this::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modified, $ids, $projectIds),
+            APIData::TYPE_PROJECTS => $this->dataAPIService->getProjects($start, $limit, $modified, $ids),
+            APIData::TYPE_MILESTONES => $this->dataAPIService->getMilestones($start, $limit, $modified, $ids, $projectIds),
+            APIData::TYPE_TICKETS => $this->dataAPIService->getTickets($start, $limit, $modified, $ids, $projectIds),
+            APIData::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modified, $ids, $projectIds),
         };
 
         return [
