@@ -115,15 +115,15 @@ class APIData
         return app('db')->connection()->query();
     }
 
-    public function getProjects(int $startId, int $limit, ?int $modifiedSinceTimestamp = null, ?array $ids = null): array
+    public function getProjects(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         $qb = $this->query();
-        $qb->select(["id", "name"]);
+        $qb->select(["id", "name", "modified"]);
         $qb->from("zp_projects", "project");
         $qb->where("project.id", ">=", $startId);
 
-        if ($modifiedSinceTimestamp !== null) {
-            $qb->where("project.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedSinceTimestamp)->format($this::DATE_FORMAT));
+        if ($modifiedAfter !== null) {
+            $qb->where("project.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format($this::DATE_FORMAT));
         }
 
         if ($ids !== null) {
@@ -139,20 +139,21 @@ class APIData
             return new ProjectData(
                 $value->id,
                 $value->name,
+                $this->getCarbonFromDatabaseValue($value->modified),
             );
         }, $values);
     }
 
-    public function getMilestones(int $startId, int $limit, int $modifiedSinceTimestamp = null, ?array $ids = null, ?array $projectIds = null): array
+    public function getMilestones(int $startId, int $limit, int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $qb = $this->query();
-        $qb->select(["id", "headline", "projectId"]);
+        $qb->select(["id", "headline", "projectId", "modified"]);
         $qb->from("zp_tickets", "ticket");
         $qb->where("ticket.id", ">=", $startId);
         $qb->where("ticket.type", "=", "milestone");
 
-        if ($modifiedSinceTimestamp !== null) {
-            $qb->where("ticket.date", ">=", CarbonImmutable::createFromTimestamp($modifiedSinceTimestamp)->format($this::DATE_FORMAT));
+        if ($modifiedAfter !== null) {
+            $qb->where("ticket.date", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format($this::DATE_FORMAT));
         }
 
         if ($ids !== null) {
@@ -173,11 +174,12 @@ class APIData
                 $value->id,
                 $value->projectId,
                 $value->headline,
+                $this->getCarbonFromDatabaseValue($value->modified),
             );
         }, $values);
     }
 
-    public function getTickets(int $startId, int $limit, int $modifiedSinceTimestamp = null, array $ids = null, ?array $projectIds = null): array
+    public function getTickets(int $startId, int $limit, int $modifiedAfter = null, array $ids = null, ?array $projectIds = null): array
     {
         $qb = $this->query();
         $qb->select(["ticket.id", "ticket.headline", "ticket.projectId", "ticket.status", "ticket.planHours", "ticket.hourRemaining", "ticket.tags", "ticket.dateToFinish", "ticket.editTo", "ticket.milestoneid", "ticket.modified", "user.username"]);
@@ -186,8 +188,8 @@ class APIData
         $qb->where("ticket.type", "<>", "milestone");
         $qb->leftJoin('zp_user as user', "user.id", "=", "ticket.userId");
 
-        if ($modifiedSinceTimestamp !== null) {
-            $qb->where("ticket.date", ">=", CarbonImmutable::createFromTimestamp($modifiedSinceTimestamp)->format($this::DATE_FORMAT));
+        if ($modifiedAfter !== null) {
+            $qb->where("ticket.date", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format($this::DATE_FORMAT));
         }
 
         if ($ids !== null) {
@@ -223,7 +225,7 @@ class APIData
         }, $values);
     }
 
-    public function getTimesheets(int $startId, int $limit, ?int $modifiedSinceTimestamp = null, ?array $ids = null, ?array $projectIds = null): array
+    public function getTimesheets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $qb = $this->query();
         $qb->from("zp_timesheets", "timesheet");
@@ -232,8 +234,8 @@ class APIData
         $qb->leftJoin('zp_user as user', "user.id", "=", "timesheet.userId");
         $qb->leftJoin('zp_tickets as ticket', "ticket.id", "=", "timesheet.ticketId");
 
-        if ($modifiedSinceTimestamp !== null) {
-            $qb->where("timesheet.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedSinceTimestamp)->format($this::DATE_FORMAT));
+        if ($modifiedAfter !== null) {
+            $qb->where("timesheet.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format($this::DATE_FORMAT));
         }
 
         if ($ids !== null) {
@@ -264,7 +266,7 @@ class APIData
         }, $values);
     }
 
-    public function getDeleted(string $type, ?int $deletedSinceTimestamp = null): array
+    public function getDeleted(string $type, ?int $deletedAfter = null): array
     {
         $qb = $this->query();
 
@@ -284,8 +286,8 @@ class APIData
             $qb->where('type', '<>', 'milestone');
         }
 
-        if ($deletedSinceTimestamp !== null) {
-            $qb->where("entry.dateDeleted", ">=", CarbonImmutable::createFromTimestamp($deletedSinceTimestamp)->format($this::DATE_FORMAT));
+        if ($deletedAfter !== null) {
+            $qb->where("entry.dateDeleted", ">=", CarbonImmutable::createFromTimestamp($deletedAfter)->format($this::DATE_FORMAT));
         }
 
         return array_map(fn ($entry) => new DeletedData(

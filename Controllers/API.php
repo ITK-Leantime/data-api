@@ -76,22 +76,22 @@ class API extends Controller
     {
         $start = (int) ($input['start'] ?? 0);
         $limit = (int) ($input['limit'] ?? 100);
-        $modified = $input['modified'] ?? null;
+        $modifiedAfter = $input['modifiedAfter'] ?? null;
         $ids = $input['ids'] ?? null;
         $projectIds = $input['projectIds'] ?? null;
 
         $results = match ($type) {
-            APIData::TYPE_PROJECTS => $this->dataAPIService->getProjects($start, $limit, $modified, $ids),
-            APIData::TYPE_MILESTONES => $this->dataAPIService->getMilestones($start, $limit, $modified, $ids, $projectIds),
-            APIData::TYPE_TICKETS => $this->dataAPIService->getTickets($start, $limit, $modified, $ids, $projectIds),
-            APIData::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modified, $ids, $projectIds),
+            APIData::TYPE_PROJECTS => $this->dataAPIService->getProjects($start, $limit, $modifiedAfter, $ids),
+            APIData::TYPE_MILESTONES => $this->dataAPIService->getMilestones($start, $limit, $modifiedAfter, $ids, $projectIds),
+            APIData::TYPE_TICKETS => $this->dataAPIService->getTickets($start, $limit, $modifiedAfter, $ids, $projectIds),
+            APIData::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modifiedAfter, $ids, $projectIds),
         };
 
         return [
             'parameters' => [
                 'start' => $start,
                 'limit' => $limit,
-                'modified' => $modified,
+                'modifiedAfter' => $modifiedAfter,
                 'ids' => $ids,
                 'projectIds' => $projectIds,
             ],
