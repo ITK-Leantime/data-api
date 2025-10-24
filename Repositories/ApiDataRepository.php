@@ -70,7 +70,7 @@ class ApiDataRepository
         $qb->from("zp_tickets", "ticket");
         $qb->where("ticket.id", ">=", $startId);
         $qb->where("ticket.type", "<>", "milestone");
-        $qb->leftJoin('zp_user as user', "user.id", "=", "ticket.userId");
+        $qb->leftJoin('zp_user as user', "user.id", "=", "ticket.editorId");
 
         if ($modifiedAfter !== null) {
             $qb->where("ticket.date", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT));
