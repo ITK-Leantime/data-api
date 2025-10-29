@@ -12,7 +12,7 @@ class ResponseData
         return [
             'parameters' => $this->parameters,
             'resultsCount' => $this->resultsCount,
-            'results' => $this->resultsCount,
+            'results' => $this->results,
         ];
     }
 }
