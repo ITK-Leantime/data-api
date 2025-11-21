@@ -1,5 +1,5 @@
 services:
   php:
-    build: ../..
+    build: .
     volumes:
       - .:/app
