@@ -3,6 +3,7 @@
 namespace Leantime\Plugins\APIData\Controllers;
 
 use Leantime\Core\Controller\Controller;
+use Leantime\Plugins\APIData\Model\ResponseData;
 use Leantime\Plugins\APIData\Services\APIData;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
@@ -20,9 +21,7 @@ class API extends Controller
 
     public function deleted(array $input): JsonResponse
     {
-        return new JsonResponse([
-            $this->getDeleted($input)
-        ]);
+        return new JsonResponse($this->getDeleted($input));
     }
 
     public function projects(array $input): JsonResponse
@@ -51,25 +50,18 @@ class API extends Controller
         $deleted = $input['deleted'] ?? null;
 
         $deletedEntries = [];
+        $count = 0;
 
         foreach ($types as $type) {
             $deletedEntries[$type] = $this->dataAPIService->getDeleted($type, $deleted);
+            $count = $count + count($deletedEntries[$type]);
         }
 
-        return [
-            'parameters' => [
-                'types' => $types,
-            ],
-            'resultsCount' => array_reduce(
-                $types,
-                function ($carry, $type) use ($deletedEntries) {
-                    $carry[$type] = count($deletedEntries[$type]);
-                    return $carry;
-                },
-                []
-            ),
-            'results' => $deletedEntries,
-        ];
+        return (new ResponseData(
+            ['types' => $types],
+            $count,
+            $deletedEntries,
+        ))->toArray();
     }
 
     private function getResults(array $input, string $type): array
@@ -87,16 +79,16 @@ class API extends Controller
             APIData::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modifiedAfter, $ids, $projectIds),
         };
 
-        return [
-            'parameters' => [
+        return (new ResponseData(
+            [
                 'start' => $start,
                 'limit' => $limit,
                 'modifiedAfter' => $modifiedAfter,
                 'ids' => $ids,
                 'projectIds' => $projectIds,
             ],
-            'resultsCount' => count($results),
-            'results' => $results,
-        ];
+            count($results),
+            $results,
+        ))->toArray();
     }
 }
