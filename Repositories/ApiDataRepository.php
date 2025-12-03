@@ -84,7 +84,7 @@ class ApiDataRepository
             ->from("zp_user", "worker")
             ->select(["worker.id", "worker.username", DB::raw("CONCAT(worker.firstname, ' ', worker.lastname) as name")])
             ->where("worker.id", ">=", $startId)
-            ->when($modifiedAfter !== null, fn ($query) => $query->where("timesheet.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
+            ->when($modifiedAfter !== null, fn ($query) => $query->where("worker.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
             ->when($ids !== null, fn ($query) => $query->whereIn("worker.id", $ids))
             ->orderBy("worker.id", "ASC")
             ->limit($limit)
