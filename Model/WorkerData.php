@@ -10,7 +10,6 @@ readonly class WorkerData
         public int                  $id,
         public string              $email,
         public string              $name,
-
     )
     {
     }
