@@ -10,6 +10,7 @@ use Leantime\Plugins\APIData\Model\MilestoneData;
 use Leantime\Plugins\APIData\Model\ProjectData;
 use Leantime\Plugins\APIData\Model\TicketData;
 use Leantime\Plugins\APIData\Model\TimesheetData;
+use Leantime\Plugins\APIData\Model\WorkerData;
 use Leantime\Plugins\APIData\Repositories\ApiDataRepository;
 
 class APIData
@@ -18,7 +19,7 @@ class APIData
     public const TYPE_MILESTONES = 'milestones';
     public const TYPE_TICKETS = 'tickets';
     public const TYPE_TIMESHEETS = 'timesheets';
-
+    public const TYPE_WORKERS = 'users';
     public const DATE_FORMAT = 'Y-m-d H:i:s';
 
     public function __construct(
@@ -177,6 +178,19 @@ class APIData
                 $this->getCarbonFromDatabaseValue($value->workDate),
                 $this->getCarbonFromDatabaseValue($value->modified),
                 $value->kind,
+            );
+        }, $values);
+    }
+
+    public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
+    {
+        $values = $this->apiDataRepository->getWorkers($startId, $limit, $modifiedAfter, $ids, $projectIds);
+
+        return array_map(function ($value) {
+            return new WorkerData(
+                $value->id,
+                $value->username,
+                $value->name,
             );
         }, $values);
     }
