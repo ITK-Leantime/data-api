@@ -4,6 +4,7 @@ namespace Leantime\Plugins\APIData\Repositories;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\DB;
 use Leantime\Plugins\APIData\Services\APIData;
 
 class ApiDataRepository
@@ -72,6 +73,20 @@ class ApiDataRepository
             ->when($ids !== null, fn ($query) => $query->whereIn("timesheet.id", $ids))
             ->when($projectIds != null, fn ($query) => $query->whereIn("ticket.projectId", $projectIds))
             ->orderBy("timesheet.id", "ASC")
+            ->limit($limit)
+            ->get()
+            ->toArray();
+    }
+
+    public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
+    {
+        return $this->query()
+            ->from("zp_user", "worker")
+            ->select(["worker.id", "worker.username", DB::raw("CONCAT(worker.firstname, ' ', worker.lastname) as name")])
+            ->where("worker.id", ">=", $startId)
+            ->when($modifiedAfter !== null, fn ($query) => $query->where("worker.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
+            ->when($ids !== null, fn ($query) => $query->whereIn("worker.id", $ids))
+            ->orderBy("worker.id", "ASC")
             ->limit($limit)
             ->get()
             ->toArray();

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+* [PR-5](https://github.com/ITK-Leantime/data-api/pull/5)
+  * Added users endpoint
+
 ## [0.0.2] - 2025-11-21
 
 * [PR-3](https://github.com/ITK-Leantime/data-api/pull/3)
