@@ -44,6 +44,11 @@ class API extends Controller
         return new JsonResponse($this->getResults($input, APIData::TYPE_TIMESHEETS));
     }
 
+    public function workers(array $input): JsonResponse
+    {
+        return new JsonResponse($this->getResults($input, APIData::TYPE_WORKERS));
+    }
+
     private function getDeleted(array $input): array
     {
         $types = $input['types'];
@@ -77,6 +82,7 @@ class API extends Controller
             APIData::TYPE_MILESTONES => $this->dataAPIService->getMilestones($start, $limit, $modifiedAfter, $ids, $projectIds),
             APIData::TYPE_TICKETS => $this->dataAPIService->getTickets($start, $limit, $modifiedAfter, $ids, $projectIds),
             APIData::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modifiedAfter, $ids, $projectIds),
+            APIData::TYPE_WORKERS => $this->dataAPIService->getWorkers($start, $limit, $modifiedAfter, $ids),
         };
 
         return (new ResponseData(
