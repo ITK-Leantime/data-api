@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+* [PR-8](https://github.com/ITK-Leantime/data-api/pull/8)
+  * Exclude api users from users endpoint
+
 ## [0.1.0] - 2025-12-04
 
 * [PR-5](https://github.com/ITK-Leantime/data-api/pull/5)
