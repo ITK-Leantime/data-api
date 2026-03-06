@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-03-06
+
 * [PR-12](https://github.com/ITK-Leantime/data-api/pull/12)
   * Excluded timesheets where hours is null.
 
@@ -26,7 +28,8 @@
 * [PR-2](https://github.com/ITK-Leantime/data-api/pull/2)
  * Initial release
 
-[Unreleased]: https://github.com/ITK-Leantime/data-api/compare/0.1.1...HEAD
+[Unreleased]: https://github.com/ITK-Leantime/data-api/compare/0.1.2...HEAD
+[0.1.2]: https://github.com/ITK-Leantime/data-api/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/ITK-Leantime/data-api/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/ITK-Leantime/data-api/compare/0.0.2...0.1.0
 [0.0.2]: https://github.com/ITK-Leantime/data-api/compare/0.0.1...0.0.2
