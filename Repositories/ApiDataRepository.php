@@ -67,6 +67,7 @@ class ApiDataRepository
             ->from("zp_timesheets", "timesheet")
             ->select(["timesheet.id", "timesheet.description", "timesheet.hours", "timesheet.workDate", "timesheet.modified", "timesheet.ticketId", "timesheet.kind", "user.username", "ticket.projectId"])
             ->where("timesheet.id", ">=", $startId)
+            ->whereNotNull("timesheet.hours")
             ->leftJoin('zp_user as user', "user.id", "=", "timesheet.userId")
             ->leftJoin('zp_tickets as ticket', "ticket.id", "=", "timesheet.ticketId")
             ->when($modifiedAfter !== null, fn ($query) => $query->where("timesheet.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))

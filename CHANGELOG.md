@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+* [PR-12](https://github.com/ITK-Leantime/data-api/pull/12)
+  * Excluded timesheets where hours is null.
+
 ## [0.1.1] - 2026-01-08
 
 * [PR-8](https://github.com/ITK-Leantime/data-api/pull/8)
