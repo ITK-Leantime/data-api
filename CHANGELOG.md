@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+* [PR-XX](https://github.com/ITK-Leantime/data-api/pull/XX)
+  * Added triggers to keep timesheets modified up to date on insert and update.
+
 ## [0.1.2] - 2026-03-06
 
 * [PR-12](https://github.com/ITK-Leantime/data-api/pull/12)

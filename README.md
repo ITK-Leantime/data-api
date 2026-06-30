@@ -12,6 +12,10 @@ During installation the following tables will be created to tracked deleted enti
 
 3 triggers will also be installed that populate the tables when entities are deleted.
 
+Two further triggers are installed on `zp_timesheets` that set `modified` to the current
+time on insert and update. This ensures timesheet changes are picked up by sync even when
+they are made through paths that do not maintain `modified` themselves.
+
 NB! The triggers are removed on uninstall, but the tables are left alone to avoid data loss through install/uninstalls.
 
 ## Endpoints

@@ -75,6 +75,20 @@ class APIData
            INSERT INTO itk_timesheets_deleted(entryId)
            VALUES (OLD.id);
         END;
+
+        CREATE TRIGGER itk_timesheets_modified_insert_trigger
+        BEFORE INSERT ON zp_timesheets
+        FOR EACH ROW
+        BEGIN
+           SET NEW.modified = NOW();
+        END;
+
+        CREATE TRIGGER itk_timesheets_modified_update_trigger
+        BEFORE UPDATE ON zp_timesheets
+        FOR EACH ROW
+        BEGIN
+           SET NEW.modified = NOW();
+        END;
         ";
 
         // Use PDO for multi-statement SQL with parameter binding
@@ -94,6 +108,8 @@ class APIData
         DROP TRIGGER itk_projects_deleted_trigger;
         DROP TRIGGER itk_tickets_deleted_trigger;
         DROP TRIGGER itk_timesheets_deleted_trigger;
+        DROP TRIGGER itk_timesheets_modified_insert_trigger;
+        DROP TRIGGER itk_timesheets_modified_update_trigger;
         ";
 
         // Tables are not remove, to preserve data through install/uninstalls.
