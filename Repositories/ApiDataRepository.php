@@ -79,7 +79,7 @@ class ApiDataRepository
             ->toArray();
     }
 
-    public function getTimesheetTotals(string $groupBy, ?int $from = null, ?int $to = null, ?array $projectIds = null): array
+    public function getTimesheetTotals(string $groupBy, ?int $from = null, ?int $to = null, ?array $projectIds = null, ?string $workDate = null): array
     {
         // ISO-8601 week (%x-W%v, Monday based) so consumers can reproduce the bucket.
         $periodExpr = $groupBy === APIData::GROUP_BY_WEEK
@@ -94,6 +94,7 @@ class ApiDataRepository
             ->when($from !== null, fn ($query) => $query->where("timesheet.workDate", ">=", CarbonImmutable::createFromTimestamp($from)->format(APIData::DATE_FORMAT)))
             ->when($to !== null, fn ($query) => $query->where("timesheet.workDate", "<=", CarbonImmutable::createFromTimestamp($to)->format(APIData::DATE_FORMAT)))
             ->when($projectIds != null, fn ($query) => $query->whereIn("ticket.projectId", $projectIds))
+            ->when($workDate !== null, fn ($query) => $query->where("timesheet.workDate", "like", $workDate . '%'))
             ->groupByRaw($periodExpr)
             ->orderBy("period", "ASC")
             ->get()

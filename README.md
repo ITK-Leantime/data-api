@@ -77,6 +77,8 @@ Attach query/body parameters to the request:
 * from: Unix timestamp. Only include entries with a workDate later than or equal to from.
 * to: Unix timestamp. Only include entries with a workDate earlier than or equal to to.
 * projectIds: Array of projectIds. Limits the totals to entities attached to projects in projectIds.
+* workDate: A year (`2026`) or year-month (`2026-06`). Only include entries whose workDate
+  falls in that year or month. Invalid values are ignored.
 
 The same filters as the timesheets endpoint are applied (entries without hours are excluded),
 so the totals reconcile against the synced timesheets. Each result has a period (`YYYY-MM-DD`
@@ -88,7 +90,7 @@ Example request:
 curl https://leantime.local.itkdev.dk/apidata/api/timesheetTotals
    -H "x-api-key: lt_1234567890"
    -H "Content-Type: application/json"
-   -d '{"groupBy":"week","from":1700000000,"projectIds":[12,13,14]}'
+   -d '{"groupBy":"week","workDate":"2026","projectIds":[12,13,14]}'
 ```
 
 ## API Key

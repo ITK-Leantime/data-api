@@ -62,8 +62,12 @@ class API extends Controller
         $from = isset($input['from']) ? (int) $input['from'] : null;
         $to = isset($input['to']) ? (int) $input['to'] : null;
         $projectIds = $input['projectIds'] ?? null;
+        // Accept a year ("2026") or year-month ("2026-06") to filter on workDate.
+        $workDate = isset($input['workDate']) && preg_match('/^\d{4}(-\d{2})?$/', (string) $input['workDate'])
+            ? (string) $input['workDate']
+            : null;
 
-        $results = $this->dataAPIService->getTimesheetTotals($groupBy, $from, $to, $projectIds);
+        $results = $this->dataAPIService->getTimesheetTotals($groupBy, $from, $to, $projectIds, $workDate);
 
         return (new ResponseData(
             [
@@ -71,6 +75,7 @@ class API extends Controller
                 'from' => $from,
                 'to' => $to,
                 'projectIds' => $projectIds,
+                'workDate' => $workDate,
             ],
             count($results),
             $results,
