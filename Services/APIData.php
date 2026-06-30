@@ -52,7 +52,7 @@ class APIData
             PRIMARY KEY (`id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-        CREATE TRIGGER itk_projects_deleted_trigger
+        CREATE OR REPLACE TRIGGER itk_projects_deleted_trigger
         AFTER DELETE ON zp_projects
         FOR EACH ROW
         BEGIN
@@ -60,7 +60,7 @@ class APIData
            VALUES (OLD.id);
         END;
 
-        CREATE TRIGGER itk_tickets_deleted_trigger
+        CREATE OR REPLACE TRIGGER itk_tickets_deleted_trigger
         AFTER DELETE ON zp_tickets
         FOR EACH ROW
         BEGIN
@@ -68,7 +68,7 @@ class APIData
            VALUES (OLD.id, OLD.type);
         END;
 
-        CREATE TRIGGER itk_timesheets_deleted_trigger
+        CREATE OR REPLACE TRIGGER itk_timesheets_deleted_trigger
         AFTER DELETE ON zp_timesheets
         FOR EACH ROW
         BEGIN
@@ -76,14 +76,14 @@ class APIData
            VALUES (OLD.id);
         END;
 
-        CREATE TRIGGER itk_timesheets_modified_insert_trigger
+        CREATE OR REPLACE TRIGGER itk_timesheets_modified_insert_trigger
         BEFORE INSERT ON zp_timesheets
         FOR EACH ROW
         BEGIN
            SET NEW.modified = NOW();
         END;
 
-        CREATE TRIGGER itk_timesheets_modified_update_trigger
+        CREATE OR REPLACE TRIGGER itk_timesheets_modified_update_trigger
         BEFORE UPDATE ON zp_timesheets
         FOR EACH ROW
         BEGIN
@@ -105,11 +105,11 @@ class APIData
     public function uninstall(): void
     {
         $sql = "
-        DROP TRIGGER itk_projects_deleted_trigger;
-        DROP TRIGGER itk_tickets_deleted_trigger;
-        DROP TRIGGER itk_timesheets_deleted_trigger;
-        DROP TRIGGER itk_timesheets_modified_insert_trigger;
-        DROP TRIGGER itk_timesheets_modified_update_trigger;
+        DROP TRIGGER IF EXISTS itk_projects_deleted_trigger;
+        DROP TRIGGER IF EXISTS itk_tickets_deleted_trigger;
+        DROP TRIGGER IF EXISTS itk_timesheets_deleted_trigger;
+        DROP TRIGGER IF EXISTS itk_timesheets_modified_insert_trigger;
+        DROP TRIGGER IF EXISTS itk_timesheets_modified_update_trigger;
         ";
 
         // Tables are not remove, to preserve data through install/uninstalls.
