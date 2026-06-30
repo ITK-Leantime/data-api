@@ -49,6 +49,34 @@ class API extends Controller
         return new JsonResponse($this->getResults($input, APIData::TYPE_WORKERS));
     }
 
+    public function timesheetTotals(array $input): JsonResponse
+    {
+        return new JsonResponse($this->getTimesheetTotals($input));
+    }
+
+    private function getTimesheetTotals(array $input): array
+    {
+        $groupBy = ($input['groupBy'] ?? null) === APIData::GROUP_BY_WEEK
+            ? APIData::GROUP_BY_WEEK
+            : APIData::GROUP_BY_DAY;
+        $from = isset($input['from']) ? (int) $input['from'] : null;
+        $to = isset($input['to']) ? (int) $input['to'] : null;
+        $projectIds = $input['projectIds'] ?? null;
+
+        $results = $this->dataAPIService->getTimesheetTotals($groupBy, $from, $to, $projectIds);
+
+        return (new ResponseData(
+            [
+                'groupBy' => $groupBy,
+                'from' => $from,
+                'to' => $to,
+                'projectIds' => $projectIds,
+            ],
+            count($results),
+            $results,
+        ))->toArray();
+    }
+
     private function getDeleted(array $input): array
     {
         $types = $input['types'];
