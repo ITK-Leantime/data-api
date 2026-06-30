@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-* [PR-XX](https://github.com/ITK-Leantime/data-api/pull/XX)
+* [PR-15](https://github.com/ITK-Leantime/data-api/pull/15)
   * Added timesheetTotals endpoint returning logged hours grouped by day or week.
 
 ## [0.1.2] - 2026-03-06
