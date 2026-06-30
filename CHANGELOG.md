@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+* [PR-15](https://github.com/ITK-Leantime/data-api/pull/15)
+  * Added timesheetTotals endpoint returning logged hours grouped by day or week.
+  * Added workYear and workMonth filters to the timesheetTotals endpoint.
+
 ## [0.1.2] - 2026-03-06
 
 * [PR-12](https://github.com/ITK-Leantime/data-api/pull/12)

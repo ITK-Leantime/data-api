@@ -2,6 +2,7 @@
 
 namespace Leantime\Plugins\APIData\Controllers;
 
+use Carbon\CarbonImmutable;
 use Leantime\Core\Controller\Controller;
 use Leantime\Plugins\APIData\Model\ResponseData;
 use Leantime\Plugins\APIData\Services\APIData;
@@ -47,6 +48,55 @@ class API extends Controller
     public function workers(array $input): JsonResponse
     {
         return new JsonResponse($this->getResults($input, APIData::TYPE_WORKERS));
+    }
+
+    public function timesheetTotals(array $input): JsonResponse
+    {
+        return new JsonResponse($this->getTimesheetTotals($input));
+    }
+
+    private function getTimesheetTotals(array $input): array
+    {
+        $groupBy = ($input['groupBy'] ?? null) === APIData::GROUP_BY_WEEK
+            ? APIData::GROUP_BY_WEEK
+            : APIData::GROUP_BY_DAY;
+        $from = isset($input['from']) ? (int) $input['from'] : null;
+        $to = isset($input['to']) ? (int) $input['to'] : null;
+        $projectIds = $input['projectIds'] ?? null;
+
+        // workYear/workMonth select a year or month on workDate as a half-open range.
+        // If only workMonth is given, the current year is assumed.
+        $workYear = isset($input['workYear']) && preg_match('/^\d{4}$/', (string) $input['workYear'])
+            ? (int) $input['workYear']
+            : null;
+        $workMonth = isset($input['workMonth']) && is_numeric($input['workMonth']) && (int) $input['workMonth'] >= 1 && (int) $input['workMonth'] <= 12
+            ? (int) $input['workMonth']
+            : null;
+
+        $workStart = null;
+        $workEnd = null;
+        if ($workYear !== null || $workMonth !== null) {
+            $workYear ??= (int) CarbonImmutable::now()->format('Y');
+            $start = CarbonImmutable::create($workYear, $workMonth ?? 1, 1, 0, 0, 0);
+            $end = $workMonth !== null ? $start->addMonth() : $start->addYear();
+            $workStart = $start->format(APIData::DATE_FORMAT);
+            $workEnd = $end->format(APIData::DATE_FORMAT);
+        }
+
+        $results = $this->dataAPIService->getTimesheetTotals($groupBy, $from, $to, $projectIds, $workStart, $workEnd);
+
+        return (new ResponseData(
+            [
+                'groupBy' => $groupBy,
+                'from' => $from,
+                'to' => $to,
+                'projectIds' => $projectIds,
+                'workYear' => $workYear,
+                'workMonth' => $workMonth,
+            ],
+            count($results),
+            $results,
+        ))->toArray();
     }
 
     private function getDeleted(array $input): array

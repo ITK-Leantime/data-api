@@ -79,6 +79,29 @@ class ApiDataRepository
             ->toArray();
     }
 
+    public function getTimesheetTotals(string $groupBy, ?int $from = null, ?int $to = null, ?array $projectIds = null, ?string $workStart = null, ?string $workEnd = null): array
+    {
+        // ISO-8601 week (%x-W%v, Monday based) so consumers can reproduce the bucket.
+        $periodExpr = $groupBy === APIData::GROUP_BY_WEEK
+            ? "DATE_FORMAT(timesheet.workDate, '%x-W%v')"
+            : "DATE_FORMAT(timesheet.workDate, '%Y-%m-%d')";
+
+        return $this->query()
+            ->from("zp_timesheets", "timesheet")
+            ->selectRaw("$periodExpr as period, SUM(timesheet.hours) as hours, COUNT(*) as count")
+            ->whereNotNull("timesheet.hours")
+            ->leftJoin('zp_tickets as ticket', "ticket.id", "=", "timesheet.ticketId")
+            ->when($from !== null, fn ($query) => $query->where("timesheet.workDate", ">=", CarbonImmutable::createFromTimestamp($from)->format(APIData::DATE_FORMAT)))
+            ->when($to !== null, fn ($query) => $query->where("timesheet.workDate", "<=", CarbonImmutable::createFromTimestamp($to)->format(APIData::DATE_FORMAT)))
+            ->when($projectIds != null, fn ($query) => $query->whereIn("ticket.projectId", $projectIds))
+            ->when($workStart !== null, fn ($query) => $query->where("timesheet.workDate", ">=", $workStart))
+            ->when($workEnd !== null, fn ($query) => $query->where("timesheet.workDate", "<", $workEnd))
+            ->groupByRaw($periodExpr)
+            ->orderBy("period", "ASC")
+            ->get()
+            ->toArray();
+    }
+
     public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         return $this->query()

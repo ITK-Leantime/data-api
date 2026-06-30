@@ -10,6 +10,7 @@ use Leantime\Plugins\APIData\Model\MilestoneData;
 use Leantime\Plugins\APIData\Model\ProjectData;
 use Leantime\Plugins\APIData\Model\TicketData;
 use Leantime\Plugins\APIData\Model\TimesheetData;
+use Leantime\Plugins\APIData\Model\TimesheetTotalData;
 use Leantime\Plugins\APIData\Model\WorkerData;
 use Leantime\Plugins\APIData\Repositories\ApiDataRepository;
 
@@ -20,6 +21,8 @@ class APIData
     public const TYPE_TICKETS = 'tickets';
     public const TYPE_TIMESHEETS = 'timesheets';
     public const TYPE_WORKERS = 'users';
+    public const GROUP_BY_DAY = 'day';
+    public const GROUP_BY_WEEK = 'week';
     public const DATE_FORMAT = 'Y-m-d H:i:s';
 
     public function __construct(
@@ -178,6 +181,19 @@ class APIData
                 $this->getCarbonFromDatabaseValue($value->workDate),
                 $this->getCarbonFromDatabaseValue($value->modified),
                 $value->kind,
+            );
+        }, $values);
+    }
+
+    public function getTimesheetTotals(string $groupBy, ?int $from = null, ?int $to = null, ?array $projectIds = null, ?string $workStart = null, ?string $workEnd = null): array
+    {
+        $values = $this->apiDataRepository->getTimesheetTotals($groupBy, $from, $to, $projectIds, $workStart, $workEnd);
+
+        return array_map(function ($value) {
+            return new TimesheetTotalData(
+                (string) $value->period,
+                round((float) $value->hours, 2),
+                (int) $value->count,
             );
         }, $values);
     }

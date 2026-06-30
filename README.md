@@ -20,6 +20,7 @@ The API consists of the following endpoints:
 
 * Get list of entities
 * Get list of deleted entities
+* Get timesheet hour totals
 
 ### Get list of entities
 
@@ -61,6 +62,36 @@ curl https://leantime.local.itkdev.dk/apidata/api/deleted
    -H "x-api-key: lt_1234567890"
    -H "Content-Type: application/json"
    -d '{"deleted":1759906882,"types":["projects","milestones","tickets","timesheets"]}'
+```
+
+### Get timesheet hour totals
+
+GET/POST: `https://{{YOUR_DOMAIN}}/apidata/api/timesheetTotals`
+
+Returns the sum of logged hours grouped by day or week. Use it as a sanity check: sum the
+synced hours per period yourself and compare to the totals to detect drift.
+
+Attach query/body parameters to the request:
+
+* groupBy: day (default) or week. Weeks are ISO-8601 (Monday based).
+* from: Unix timestamp. Only include entries with a workDate later than or equal to from.
+* to: Unix timestamp. Only include entries with a workDate earlier than or equal to to.
+* projectIds: Array of projectIds. Limits the totals to entities attached to projects in projectIds.
+* workYear: A year (e.g. `2025`). Only include entries whose workDate falls in that year.
+* workMonth: A month, 1-12 (e.g. `06`). Only include entries whose workDate falls in that
+  month. If workMonth is given without workYear, the current year is assumed.
+
+The same filters as the timesheets endpoint are applied (entries without hours are excluded),
+so the totals reconcile against the synced timesheets. Each result has a period (`YYYY-MM-DD`
+for days, `YYYY-Www` for weeks), the summed hours (rounded to 2 decimals) and the entry count.
+
+Example request:
+
+```shell
+curl https://leantime.local.itkdev.dk/apidata/api/timesheetTotals
+   -H "x-api-key: lt_1234567890"
+   -H "Content-Type: application/json"
+   -d '{"groupBy":"week","workYear":2025,"workMonth":6,"projectIds":[12,13,14]}'
 ```
 
 ## API Key
