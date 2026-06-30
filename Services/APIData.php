@@ -185,9 +185,9 @@ class APIData
         }, $values);
     }
 
-    public function getTimesheetTotals(string $groupBy, ?int $from = null, ?int $to = null, ?array $projectIds = null, ?string $workDate = null): array
+    public function getTimesheetTotals(string $groupBy, ?int $from = null, ?int $to = null, ?array $projectIds = null, ?string $workStart = null, ?string $workEnd = null): array
     {
-        $values = $this->apiDataRepository->getTimesheetTotals($groupBy, $from, $to, $projectIds, $workDate);
+        $values = $this->apiDataRepository->getTimesheetTotals($groupBy, $from, $to, $projectIds, $workStart, $workEnd);
 
         return array_map(function ($value) {
             return new TimesheetTotalData(

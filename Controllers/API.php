@@ -2,6 +2,7 @@
 
 namespace Leantime\Plugins\APIData\Controllers;
 
+use Carbon\CarbonImmutable;
 use Leantime\Core\Controller\Controller;
 use Leantime\Plugins\APIData\Model\ResponseData;
 use Leantime\Plugins\APIData\Services\APIData;
@@ -62,12 +63,27 @@ class API extends Controller
         $from = isset($input['from']) ? (int) $input['from'] : null;
         $to = isset($input['to']) ? (int) $input['to'] : null;
         $projectIds = $input['projectIds'] ?? null;
-        // Accept a year ("2026") or year-month ("2026-06") to filter on workDate.
-        $workDate = isset($input['workDate']) && preg_match('/^\d{4}(-\d{2})?$/', (string) $input['workDate'])
-            ? (string) $input['workDate']
+
+        // workYear/workMonth select a year or month on workDate as a half-open range.
+        // If only workMonth is given, the current year is assumed.
+        $workYear = isset($input['workYear']) && preg_match('/^\d{4}$/', (string) $input['workYear'])
+            ? (int) $input['workYear']
+            : null;
+        $workMonth = isset($input['workMonth']) && is_numeric($input['workMonth']) && (int) $input['workMonth'] >= 1 && (int) $input['workMonth'] <= 12
+            ? (int) $input['workMonth']
             : null;
 
-        $results = $this->dataAPIService->getTimesheetTotals($groupBy, $from, $to, $projectIds, $workDate);
+        $workStart = null;
+        $workEnd = null;
+        if ($workYear !== null || $workMonth !== null) {
+            $workYear ??= (int) CarbonImmutable::now()->format('Y');
+            $start = CarbonImmutable::create($workYear, $workMonth ?? 1, 1, 0, 0, 0);
+            $end = $workMonth !== null ? $start->addMonth() : $start->addYear();
+            $workStart = $start->format(APIData::DATE_FORMAT);
+            $workEnd = $end->format(APIData::DATE_FORMAT);
+        }
+
+        $results = $this->dataAPIService->getTimesheetTotals($groupBy, $from, $to, $projectIds, $workStart, $workEnd);
 
         return (new ResponseData(
             [
@@ -75,7 +91,8 @@ class API extends Controller
                 'from' => $from,
                 'to' => $to,
                 'projectIds' => $projectIds,
-                'workDate' => $workDate,
+                'workYear' => $workYear,
+                'workMonth' => $workMonth,
             ],
             count($results),
             $results,
