@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+* [PR-13](https://github.com/ITK-Leantime/data-api/pull/13)
+  * Normalize scaffolding.
+
 ## [0.1.2] - 2026-03-06
 
 * [PR-12](https://github.com/ITK-Leantime/data-api/pull/12)
