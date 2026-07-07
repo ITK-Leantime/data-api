@@ -19,36 +19,85 @@ class API extends Controller
         $this->dataAPIService = $dataAPIService;
     }
 
+    /**
+     * Return deleted-entity entries for the requested types.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return JsonResponse
+     */
     public function deleted(array $input): JsonResponse
     {
         return new JsonResponse($this->getDeleted($input));
     }
 
+    /**
+     * Return projects.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return JsonResponse
+     */
     public function projects(array $input): JsonResponse
     {
         return new JsonResponse($this->getResults($input, APIData::TYPE_PROJECTS));
     }
 
+    /**
+     * Return milestones.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return JsonResponse
+     */
     public function milestones(array $input): JsonResponse
     {
         return new JsonResponse($this->getResults($input, APIData::TYPE_MILESTONES));
     }
 
+    /**
+     * Return tickets.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return JsonResponse
+     */
     public function tickets(array $input): JsonResponse
     {
         return new JsonResponse($this->getResults($input, APIData::TYPE_TICKETS));
     }
 
+    /**
+     * Return timesheets.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return JsonResponse
+     */
     public function timesheets(array $input): JsonResponse
     {
         return new JsonResponse($this->getResults($input, APIData::TYPE_TIMESHEETS));
     }
 
+    /**
+     * Return workers.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return JsonResponse
+     */
     public function workers(array $input): JsonResponse
     {
         return new JsonResponse($this->getResults($input, APIData::TYPE_WORKERS));
     }
 
+    /**
+     * Build the deleted-entity response payload.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return array<string, mixed>
+     */
     private function getDeleted(array $input): array
     {
         $types = $input['types'];
@@ -69,6 +118,14 @@ class API extends Controller
         ))->toArray();
     }
 
+    /**
+     * Build the results response payload for a given type.
+     *
+     * @param array<string, mixed> $input
+     * @param string               $type  One of the APIData::TYPE_* constants.
+     *
+     * @return array<string, mixed>
+     */
     private function getResults(array $input, string $type): array
     {
         $start = (int) ($input['start'] ?? 0);
@@ -83,6 +140,7 @@ class API extends Controller
             APIData::TYPE_TICKETS => $this->dataAPIService->getTickets($start, $limit, $modifiedAfter, $ids, $projectIds),
             APIData::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modifiedAfter, $ids, $projectIds),
             APIData::TYPE_WORKERS => $this->dataAPIService->getWorkers($start, $limit, $modifiedAfter, $ids),
+            default => throw new \InvalidArgumentException("Invalid type: $type"),
         };
 
         return (new ResponseData(

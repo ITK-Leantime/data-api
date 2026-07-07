@@ -11,5 +11,6 @@ readonly class MilestoneData
         public int $projectId,
         public string $name,
         public ?CarbonInterface $modified,
-    ) {}
+    ) {
+    }
 }

@@ -13,8 +13,9 @@ readonly class TimesheetData
         public ?string $description,
         public float $hours,
         public string $username,
+        public string $kind,
         public ?CarbonInterface $workDate = null,
         public ?CarbonInterface $modified = null,
-        public string $kind,
-    ) {}
+    ) {
+    }
 }

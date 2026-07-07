@@ -6,6 +6,9 @@ use Carbon\CarbonInterface;
 
 readonly class TicketData
 {
+    /**
+     * @param array<int, string> $tags
+     */
     public function __construct(
         public int $id,
         public int $projectId,
@@ -19,5 +22,6 @@ readonly class TicketData
         public ?CarbonInterface $dueDate,
         public ?CarbonInterface $resolutionDate,
         public ?CarbonInterface $modified,
-    ) {}
+    ) {
+    }
 }

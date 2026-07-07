@@ -10,5 +10,6 @@ readonly class ProjectData
         public int $id,
         public string $name,
         public ?CarbonInterface $modified,
-    ) {}
+    ) {
+    }
 }
