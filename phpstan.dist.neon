@@ -1,0 +1,12 @@
+parameters:
+    level: 6
+    paths:
+        - .
+
+    excludePaths:
+        - vendor
+        - node_modules
+
+# Local Variables:
+# mode: yaml
+# End:
