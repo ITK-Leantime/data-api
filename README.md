@@ -79,3 +79,58 @@ curl https://{{YOUR_DOMAIN}}/apidata/api/{{TYPE}}
    -H "Content-Type: application/json"
    -d '{"start":0,"limit":100}'
 ```
+
+## Development
+
+### Install
+
+```shell name=development-install
+docker run --interactive --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer install
+```
+
+### Composer normalize
+
+```shell name=composer-normalize
+docker run --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer normalize
+```
+
+### Coding standards
+
+#### Check and apply with phpcs
+
+```shell name=check-coding-standards
+docker run --interactive --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer coding-standards-check
+```
+
+```shell name=apply-coding-standards
+docker run --interactive --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer coding-standards-apply
+```
+
+#### Check and apply markdownlint
+
+```shell name=markdown-check
+docker run --rm --volume "$PWD:/md" itkdev/markdownlint '**/*.md'
+```
+
+```shell name=markdown-apply
+docker run --rm --volume "$PWD:/md" itkdev/markdownlint '**/*.md' --fix
+```
+
+#### Check with shellcheck
+
+```shell name=shell-check
+docker run --rm --volume "$PWD:/app" --workdir /app peterdavehello/shellcheck shellcheck --external-sources --source-path=SCRIPTDIR bin/create-release
+docker run --rm --volume "$PWD:/app" --workdir /app peterdavehello/shellcheck shellcheck --external-sources --source-path=SCRIPTDIR bin/local.create-release
+```
+
+### Code analysis
+
+```shell name=code-analysis
+docker run --interactive --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer code-analysis
+```
+
+## Test release build
+
+```shell name=test-create-release
+docker compose build && docker compose run --rm php bin/create-release dev-test
+```
