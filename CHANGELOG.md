@@ -23,13 +23,14 @@
 ## [0.0.2] - 2025-11-21
 
 * [PR-3](https://github.com/ITK-Leantime/data-api/pull/3)
- * Added release bin scripts
+* Added release bin scripts
 
 ## [0.0.1] - 2025-11-21
+
 * [PR-1](https://github.com/ITK-Leantime/data-api/pull/1)
- * Initial plugin
+* Initial plugin
 * [PR-2](https://github.com/ITK-Leantime/data-api/pull/2)
- * Initial release
+* Initial release
 
 [Unreleased]: https://github.com/ITK-Leantime/data-api/compare/0.1.2...HEAD
 [0.1.2]: https://github.com/ITK-Leantime/data-api/compare/0.1.1...0.1.2
