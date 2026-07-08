@@ -9,11 +9,26 @@ use Leantime\Plugins\APIData\Services\APIData;
 
 class ApiDataRepository
 {
+    /**
+     * Build a fresh query builder on the default connection.
+     *
+     * @return Builder
+     */
     private function query(): Builder
     {
         return app('db')->connection()->query();
     }
 
+    /**
+     * Fetch projects.
+     *
+     * @param int                         $startId       Lowest project id to include.
+     * @param int                         $limit         Maximum number of rows to return.
+     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
+     * @param array<int, int|string>|null $ids           Optional list of project ids to filter by.
+     *
+     * @return array<int, \stdClass>
+     */
     public function getProjects(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         return $this->query()
@@ -28,6 +43,17 @@ class ApiDataRepository
             ->toArray();
     }
 
+    /**
+     * Fetch milestones (tickets of type "milestone").
+     *
+     * @param int                         $startId       Lowest ticket id to include.
+     * @param int                         $limit         Maximum number of rows to return.
+     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
+     * @param array<int, int|string>|null $ids           Optional list of ticket ids to filter by.
+     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     *
+     * @return array<int, \stdClass>
+     */
     public function getMilestones(int $startId, int $limit, int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
@@ -44,6 +70,17 @@ class ApiDataRepository
             ->toArray();
     }
 
+    /**
+     * Fetch tickets (excluding milestones).
+     *
+     * @param int                         $startId       Lowest ticket id to include.
+     * @param int                         $limit         Maximum number of rows to return.
+     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
+     * @param array<int, int|string>|null $ids           Optional list of ticket ids to filter by.
+     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     *
+     * @return array<int, \stdClass>
+     */
     public function getTickets(int $startId, int $limit, int $modifiedAfter = null, array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
@@ -61,6 +98,17 @@ class ApiDataRepository
             ->toArray();
     }
 
+    /**
+     * Fetch timesheets.
+     *
+     * @param int                         $startId       Lowest timesheet id to include.
+     * @param int                         $limit         Maximum number of rows to return.
+     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
+     * @param array<int, int|string>|null $ids           Optional list of timesheet ids to filter by.
+     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     *
+     * @return array<int, \stdClass>
+     */
     public function getTimesheets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
@@ -79,6 +127,16 @@ class ApiDataRepository
             ->toArray();
     }
 
+    /**
+     * Fetch workers (non-API users).
+     *
+     * @param int                         $startId       Lowest user id to include.
+     * @param int                         $limit         Maximum number of rows to return.
+     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
+     * @param array<int, int|string>|null $ids           Optional list of user ids to filter by.
+     *
+     * @return array<int, \stdClass>
+     */
     public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         return $this->query()
@@ -94,6 +152,14 @@ class ApiDataRepository
             ->toArray();
     }
 
+    /**
+     * Fetch deleted-entity tracking entries for a given type.
+     *
+     * @param string   $type         One of the APIData::TYPE_* constants.
+     * @param int|null $deletedAfter Optional unix timestamp lower bound.
+     *
+     * @return array<int, \stdClass>
+     */
     public function getDeleted(string $type, ?int $deletedAfter = null): array
     {
         $tableName = match ($type) {
@@ -111,5 +177,82 @@ class ApiDataRepository
             ->when($deletedAfter !== null, fn ($query) => $query->where("entry.dateDeleted", ">=", CarbonImmutable::createFromTimestamp($deletedAfter)->format(APIData::DATE_FORMAT)))
             ->get()
             ->toArray();
+    }
+
+    /**
+     * Create the deleted-entity tracking tables and their triggers.
+     *
+     * Uses unprepared() because this is multi-statement DDL: the CREATE TRIGGER
+     * bodies contain their own statement terminators, which a prepared statement
+     * cannot handle.
+     *
+     * @return void
+     */
+    public function setupTables(): void
+    {
+        app('db')->connection()->unprepared(<<<'SQL'
+            CREATE TABLE IF NOT EXISTS `itk_projects_deleted` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `entryId` int(11) DEFAULT NULL,
+                `dateDeleted` datetime DEFAULT NOW(),
+                PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TABLE IF NOT EXISTS `itk_tickets_deleted` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `entryId` int(11) DEFAULT NULL,
+                `type` varchar(255) DEFAULT NULL,
+                `dateDeleted` datetime DEFAULT NOW(),
+                PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TABLE IF NOT EXISTS `itk_timesheets_deleted` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `entryId` int(11) DEFAULT NULL,
+                `dateDeleted` datetime DEFAULT NOW(),
+                PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TRIGGER itk_projects_deleted_trigger
+            AFTER DELETE ON zp_projects
+            FOR EACH ROW
+            BEGIN
+               INSERT INTO itk_projects_deleted(entryId)
+               VALUES (OLD.id);
+            END;
+
+            CREATE TRIGGER itk_tickets_deleted_trigger
+            AFTER DELETE ON zp_tickets
+            FOR EACH ROW
+            BEGIN
+               INSERT INTO itk_tickets_deleted(entryId, type)
+               VALUES (OLD.id, OLD.type);
+            END;
+
+            CREATE TRIGGER itk_timesheets_deleted_trigger
+            AFTER DELETE ON zp_timesheets
+            FOR EACH ROW
+            BEGIN
+               INSERT INTO itk_timesheets_deleted(entryId)
+               VALUES (OLD.id);
+            END;
+        SQL);
+    }
+
+    /**
+     * Drop the deleted-entity tracking triggers.
+     *
+     * The tables are intentionally left in place so their data survives an
+     * install/uninstall cycle.
+     *
+     * @return void
+     */
+    public function removeTriggers(): void
+    {
+        app('db')->connection()->unprepared(<<<'SQL'
+            DROP TRIGGER itk_projects_deleted_trigger;
+            DROP TRIGGER itk_tickets_deleted_trigger;
+            DROP TRIGGER itk_timesheets_deleted_trigger;
+        SQL);
     }
 }

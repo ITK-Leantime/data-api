@@ -3,7 +3,6 @@
 namespace Leantime\Plugins\APIData\Services;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Query\Builder;
 use Leantime\Domain\Tickets\Repositories\Tickets as TicketRepository;
 use Leantime\Plugins\APIData\Model\DeletedData;
 use Leantime\Plugins\APIData\Model\MilestoneData;
@@ -25,93 +24,31 @@ class APIData
     public function __construct(
         private readonly TicketRepository $ticketRepository,
         private readonly ApiDataRepository $apiDataRepository,
-    ) {}
+    ) {
+    }
 
     public function install(): void
     {
-        $sql = "
-        CREATE TABLE IF NOT EXISTS `itk_projects_deleted` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `entryId` int(11) DEFAULT NULL,
-            `dateDeleted` datetime DEFAULT NOW(),
-            PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TABLE IF NOT EXISTS `itk_tickets_deleted` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `entryId` int(11) DEFAULT NULL,
-            `type` varchar(255) DEFAULT NULL,
-            `dateDeleted` datetime DEFAULT NOW(),
-            PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TABLE IF NOT EXISTS `itk_timesheets_deleted` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `entryId` int(11) DEFAULT NULL,
-            `dateDeleted` datetime DEFAULT NOW(),
-            PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TRIGGER itk_projects_deleted_trigger
-        AFTER DELETE ON zp_projects
-        FOR EACH ROW
-        BEGIN
-           INSERT INTO itk_projects_deleted(entryId)
-           VALUES (OLD.id);
-        END;
-
-        CREATE TRIGGER itk_tickets_deleted_trigger
-        AFTER DELETE ON zp_tickets
-        FOR EACH ROW
-        BEGIN
-           INSERT INTO itk_tickets_deleted(entryId, type)
-           VALUES (OLD.id, OLD.type);
-        END;
-
-        CREATE TRIGGER itk_timesheets_deleted_trigger
-        AFTER DELETE ON zp_timesheets
-        FOR EACH ROW
-        BEGIN
-           INSERT INTO itk_timesheets_deleted(entryId)
-           VALUES (OLD.id);
-        END;
-        ";
-
-        // Use PDO for multi-statement SQL with parameter binding
-        // We need to use PDO directly because Laravel's statement() method
-        // may not handle multi-statement SQL properly
-        $pdo = app('db')->connection()->getPdo();
-        $stmn = $pdo->prepare($sql);
-
-        $stmn->execute();
-
-        $stmn->closeCursor();
+        $this->apiDataRepository->setupTables();
     }
 
     public function uninstall(): void
     {
-        $sql = "
-        DROP TRIGGER itk_projects_deleted_trigger;
-        DROP TRIGGER itk_tickets_deleted_trigger;
-        DROP TRIGGER itk_timesheets_deleted_trigger;
-        ";
-
-        // Tables are not remove, to preserve data through install/uninstalls.
-        // DROP TABLE `itk_projects_deleted`;
-        // DROP TABLE `itk_tickets_deleted`;
-        // DROP TABLE `itk_timesheets_deleted`;
-
-        // Use PDO for multi-statement SQL with parameter binding
-        // We need to use PDO directly because Laravel's statement() method
-        // may not handle multi-statement SQL properly
-        $pdo = app('db')->connection()->getPdo();
-        $stmn = $pdo->prepare($sql);
-
-        $stmn->execute();
-
-        $stmn->closeCursor();
+        // The tables are intentionally left in place to preserve data through
+        // install/uninstall cycles; only the triggers are removed.
+        $this->apiDataRepository->removeTriggers();
     }
 
+    /**
+     * Fetch projects mapped to ProjectData models.
+     *
+     * @param int                         $startId       Lowest project id to include.
+     * @param int                         $limit         Maximum number of rows to return.
+     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
+     * @param array<int, int|string>|null $ids           Optional list of project ids to filter by.
+     *
+     * @return array<int, ProjectData>
+     */
     public function getProjects(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         $values = $this->apiDataRepository->getProjects($startId, $limit, $modifiedAfter, $ids);
@@ -125,6 +62,17 @@ class APIData
         }, $values);
     }
 
+    /**
+     * Fetch milestones mapped to MilestoneData models.
+     *
+     * @param int                         $startId       Lowest ticket id to include.
+     * @param int                         $limit         Maximum number of rows to return.
+     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
+     * @param array<int, int|string>|null $ids           Optional list of ticket ids to filter by.
+     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     *
+     * @return array<int, MilestoneData>
+     */
     public function getMilestones(int $startId, int $limit, int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getMilestones($startId, $limit, $modifiedAfter, $ids, $projectIds);
@@ -139,6 +87,17 @@ class APIData
         }, $values);
     }
 
+    /**
+     * Fetch tickets mapped to TicketData models.
+     *
+     * @param int                         $startId       Lowest ticket id to include.
+     * @param int                         $limit         Maximum number of rows to return.
+     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
+     * @param array<int, int|string>|null $ids           Optional list of ticket ids to filter by.
+     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     *
+     * @return array<int, TicketData>
+     */
     public function getTickets(int $startId, int $limit, int $modifiedAfter = null, array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getTickets($startId, $limit, $modifiedAfter, $ids, $projectIds);
@@ -163,6 +122,17 @@ class APIData
         }, $values);
     }
 
+    /**
+     * Fetch timesheets mapped to TimesheetData models.
+     *
+     * @param int                         $startId       Lowest timesheet id to include.
+     * @param int                         $limit         Maximum number of rows to return.
+     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
+     * @param array<int, int|string>|null $ids           Optional list of timesheet ids to filter by.
+     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     *
+     * @return array<int, TimesheetData>
+     */
     public function getTimesheets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getTimesheets($startId, $limit, $modifiedAfter, $ids, $projectIds);
@@ -175,16 +145,27 @@ class APIData
                 $value->description,
                 $value->hours,
                 $value->username,
+                $value->kind,
                 $this->getCarbonFromDatabaseValue($value->workDate),
                 $this->getCarbonFromDatabaseValue($value->modified),
-                $value->kind,
             );
         }, $values);
     }
 
+    /**
+     * Fetch workers mapped to WorkerData models.
+     *
+     * @param int                         $startId       Lowest user id to include.
+     * @param int                         $limit         Maximum number of rows to return.
+     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
+     * @param array<int, int|string>|null $ids           Optional list of user ids to filter by.
+     * @param array<int, int|string>|null $projectIds    Accepted for interface symmetry; workers are not project-scoped.
+     *
+     * @return array<int, WorkerData>
+     */
     public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
-        $values = $this->apiDataRepository->getWorkers($startId, $limit, $modifiedAfter, $ids, $projectIds);
+        $values = $this->apiDataRepository->getWorkers($startId, $limit, $modifiedAfter, $ids);
 
         return array_map(function ($value) {
             return new WorkerData(
@@ -195,6 +176,14 @@ class APIData
         }, $values);
     }
 
+    /**
+     * Fetch deleted-entity entries mapped to DeletedData models.
+     *
+     * @param string   $type         One of the APIData::TYPE_* constants.
+     * @param int|null $deletedAfter Optional unix timestamp lower bound.
+     *
+     * @return array<int, DeletedData>
+     */
     public function getDeleted(string $type, ?int $deletedAfter = null): array
     {
         $values = $this->apiDataRepository->getDeleted($type, $deletedAfter);
@@ -205,17 +194,31 @@ class APIData
         ), $values);
     }
 
-    private function getCarbonFromDatabaseValue($value): ?CarbonImmutable
+    /**
+     * Parse a database datetime value into a CarbonImmutable, or null.
+     *
+     * @param mixed $value Raw database value (datetime string or null).
+     *
+     * @return CarbonImmutable|null
+     */
+    private function getCarbonFromDatabaseValue(mixed $value): ?CarbonImmutable
     {
         // "0000-00-00 00:00:00" equals null.
         return $value !== null && $value !== "0000-00-00 00:00:00"
-            ? CarbonImmutable::createFromFormat(APIData::DATE_FORMAT, $value, 'UTC')
+            ? CarbonImmutable::createFromFormat(APIData::DATE_FORMAT, (string) $value, 'UTC')
             : null;
     }
 
-    private function getMilestoneId(mixed $value)
+    /**
+     * Resolve a ticket's milestone id, treating 0 as null.
+     *
+     * @param mixed $value Row containing a milestoneid property.
+     *
+     * @return int|null
+     */
+    private function getMilestoneId(mixed $value): ?int
     {
         // milestoneid=0 equals null.
-        return $value->milestoneid !== null && $value->milestoneid > 0 ? $value->milestoneid : null;
+        return $value->milestoneid !== null && $value->milestoneid > 0 ? (int) $value->milestoneid : null;
     }
 }
