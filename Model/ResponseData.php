@@ -2,6 +2,9 @@
 
 namespace Leantime\Plugins\APIData\Model;
 
+/**
+ * Envelope for an API response: echoed parameters, a result count and the results.
+ */
 class ResponseData
 {
     /**

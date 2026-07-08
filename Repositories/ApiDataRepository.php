@@ -7,6 +7,9 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Leantime\Plugins\APIData\Services\APIData;
 
+/**
+ * Data access for the APIData plugin's export queries and deleted-entity tracking.
+ */
 class ApiDataRepository
 {
     /**

@@ -12,6 +12,10 @@ use Leantime\Plugins\APIData\Model\TimesheetData;
 use Leantime\Plugins\APIData\Model\WorkerData;
 use Leantime\Plugins\APIData\Repositories\ApiDataRepository;
 
+/**
+ * Business logic for the APIData plugin: exports projects, milestones, tickets,
+ * timesheets, workers and deleted-entity entries as typed data objects.
+ */
 class APIData
 {
     public const TYPE_PROJECTS = 'projects';
@@ -21,17 +25,30 @@ class APIData
     public const TYPE_WORKERS = 'users';
     public const DATE_FORMAT = 'Y-m-d H:i:s';
 
+    /**
+     * Inject the ticket and API data repositories.
+     */
     public function __construct(
         private readonly TicketRepository $ticketRepository,
         private readonly ApiDataRepository $apiDataRepository,
     ) {
     }
 
+    /**
+     * Create the deleted-entity tracking tables and triggers.
+     *
+     * @return void
+     */
     public function install(): void
     {
         $this->apiDataRepository->setupTables();
     }
 
+    /**
+     * Remove the deleted-entity tracking triggers (tables are preserved).
+     *
+     * @return void
+     */
     public function uninstall(): void
     {
         // The tables are intentionally left in place to preserve data through

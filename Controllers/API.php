@@ -14,6 +14,13 @@ class API extends Controller
 {
     private APIData $dataAPIService;
 
+    /**
+     * Inject the APIData service.
+     *
+     * @param APIData $dataAPIService
+     *
+     * @return void
+     */
     public function init(APIData $dataAPIService): void
     {
         $this->dataAPIService = $dataAPIService;
