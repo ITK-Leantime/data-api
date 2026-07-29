@@ -7,3 +7,5 @@ composer.lock
 release/
 checksum.txt
 *.tar.gz
+
+economics

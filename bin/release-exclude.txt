@@ -1,6 +1,7 @@
 *.tar.gz
 .git*
 .php-cs-fixer.dist.php
+.phpunit.cache
 .twig-cs-fixer.dist.php
 bin
 checksum.txt
@@ -8,3 +9,7 @@ compose.yaml
 composer.lock
 vendor
 Dockerfile
+phpunit.xml
+phpunit.xml.dist
+Taskfile.yml
+tests

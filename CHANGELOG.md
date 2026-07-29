@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+* [PR-14](https://github.com/ITK-Leantime/data-api/pull/14)
+  * Allowed null values in API models, so entries referencing deleted users or deleted tickets no longer fail the whole request.
+  * Added userId to timesheets, so hours logged by a deleted user stay attributable.
+  * Stopped resolving ticket status against the session's project when a ticket has no project.
+  * Added PHPUnit test setup and a Taskfile for running it.
+
 ## [0.1.2] - 2026-03-06
 
 * [PR-12](https://github.com/ITK-Leantime/data-api/pull/12)

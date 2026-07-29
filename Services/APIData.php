@@ -144,7 +144,12 @@ class APIData
         $values = $this->apiDataRepository->getTickets($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
         return array_map(function ($value) {
-            $projectStatuses = $this->ticketRepository->getStateLabels($value->projectId);
+            // Asked for labels without a project id, Leantime falls back to
+            // session('currentProject'), which would resolve the status against
+            // an unrelated project.
+            $projectStatuses = $value->projectId !== null
+                ? $this->ticketRepository->getStateLabels($value->projectId)
+                : [];
 
             return new TicketData(
                 $value->id,
@@ -168,16 +173,20 @@ class APIData
         $values = $this->apiDataRepository->getTimesheets($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
         return array_map(function ($value) {
+            // Named arguments: CarbonImmutable has a __toString(), so a
+            // mis-ordered date would be coerced into one of the string
+            // parameters instead of raising a TypeError.
             return new TimesheetData(
-                $value->id,
-                $value->ticketId,
-                $value->projectId,
-                $value->description,
-                $value->hours,
-                $value->username,
-                $this->getCarbonFromDatabaseValue($value->workDate),
-                $this->getCarbonFromDatabaseValue($value->modified),
-                $value->kind,
+                id: $value->id,
+                ticketId: $value->ticketId,
+                projectId: $value->projectId,
+                description: $value->description,
+                hours: $value->hours,
+                userId: $value->userId,
+                username: $value->username,
+                kind: $value->kind,
+                workDate: $this->getCarbonFromDatabaseValue($value->workDate),
+                modified: $this->getCarbonFromDatabaseValue($value->modified),
             );
         }, $values);
     }

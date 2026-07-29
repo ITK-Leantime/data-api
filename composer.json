@@ -12,9 +12,22 @@
     ],
     "homepage": "https://github.com/ITK-Leantime/leantime-data-api",
     "require-dev": {
+        "illuminate/database": "^11.0",
+        "nesbot/carbon": "^2.72.2 || ^3.0",
+        "phpunit/phpunit": "^11.0"
     },
     "config": {
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Leantime\\Plugins\\APIData\\": "",
+            "Leantime\\Plugins\\APIData\\Tests\\": "tests/"
+        },
+        "classmap": [
+            "tests/Stub/"
+        ]
+    },
     "scripts": {
+        "test": "phpunit"
     }
 }

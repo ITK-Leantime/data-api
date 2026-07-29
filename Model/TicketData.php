@@ -8,8 +8,8 @@ readonly class TicketData
 {
     public function __construct(
         public int $id,
-        public int $projectId,
-        public string $name,
+        public ?int $projectId,
+        public ?string $name,
         public ?string $status,
         public ?int $milestoneId,
         public array $tags,

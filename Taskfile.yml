@@ -1,0 +1,62 @@
+# https://taskfile.dev — install with `brew install go-task` (or see docs).
+# Run `task` (or `task --list-all`) to see all available commands.
+#
+# This plugin has no long-running stack, so everything runs in a one-off
+# container built from the local Dockerfile (itkdev/php8.3-fpm).
+
+version: "3"
+
+vars:
+  # https://taskfile.dev/reference/templating/
+  DOCKER_COMPOSE: '{{ .TASK_DOCKER_COMPOSE | default "docker compose" }}'
+
+tasks:
+  default:
+    desc: List all tasks
+    cmds:
+      - task --list-all
+    silent: true
+
+  # -------------------------------------------------------------- Wrappers ---
+
+  compose:
+    desc: "Run a docker compose command. Example: task compose -- build php."
+    cmds:
+      - "{{ .DOCKER_COMPOSE }} {{ .CLI_ARGS }}"
+
+  php:
+    desc: "Run a command in a one-off php container. Example: task php -- php --version."
+    cmds:
+      - task compose -- run --rm --no-deps php {{ .CLI_ARGS }}
+    silent: true
+
+  composer:
+    desc: "Run a composer command. Example: task composer -- install."
+    cmds:
+      - task php -- composer {{ .CLI_ARGS }}
+    silent: true
+
+  # ------------------------------------------------------------ Lifecycle ---
+
+  setup:
+    desc: Build the php image and install dev dependencies.
+    cmds:
+      - task compose -- build php
+      - task composer -- install
+
+  # ------------------------------------------------------------ PHP tests ---
+
+  test:
+    desc: "Run the PHP test suite. Example: task test -- --filter TimesheetData."
+    cmds:
+      - task php -- vendor/bin/phpunit {{ .CLI_ARGS }}
+    silent: true
+
+  lint:
+    desc: Syntax-check all PHP files.
+    cmds:
+      - >-
+        task php -- sh -c
+        'find Controllers Model Repositories Services -name "*.php" -print0
+        | xargs -0 -n1 -- php -l'
+    silent: true
