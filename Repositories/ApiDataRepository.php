@@ -28,14 +28,14 @@ class ApiDataRepository
             ->toArray();
     }
 
-    public function getMilestones(int $startId, int $limit, int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
+    public function getMilestones(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
             ->select(["id", "headline", "projectId", "modified"])
             ->from("zp_tickets", "ticket")
             ->where("ticket.id", ">=", $startId)
             ->where("ticket.type", "=", "milestone")
-            ->when($modifiedAfter !== null, fn ($query) => $query->where("ticket.date", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
+            ->when($modifiedAfter !== null, fn ($query) => $query->where("ticket.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
             ->when($ids !== null, fn ($query) => $query->whereIn("ticket.id", $ids))
             ->when($projectIds != null, fn ($query) => $query->whereIn("ticket.projectId", $projectIds))
             ->orderBy("id", "ASC")
@@ -44,7 +44,7 @@ class ApiDataRepository
             ->toArray();
     }
 
-    public function getTickets(int $startId, int $limit, int $modifiedAfter = null, array $ids = null, ?array $projectIds = null): array
+    public function getTickets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
             ->select(["ticket.id", "ticket.headline", "ticket.projectId", "ticket.status", "ticket.planHours", "ticket.hourRemaining", "ticket.tags", "ticket.dateToFinish", "ticket.editTo", "ticket.milestoneid", "ticket.modified", "user.username"])
@@ -52,7 +52,7 @@ class ApiDataRepository
             ->where("ticket.id", ">=", $startId)
             ->where("ticket.type", "<>", "milestone")
             ->leftJoin('zp_user as user', "user.id", "=", "ticket.editorId")
-            ->when($modifiedAfter !== null, fn ($query) => $query->where("ticket.date", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
+            ->when($modifiedAfter !== null, fn ($query) => $query->where("ticket.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
             ->when($ids !== null, fn ($query) => $query->whereIn("ticket.id", $ids))
             ->when($projectIds != null, fn ($query) => $query->whereIn("ticket.projectId", $projectIds))
             ->orderBy("id", "ASC")

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+* [PR-15](https://github.com/ITK-Leantime/data-api/pull/15)
+  * Fixed modifiedAfter for tickets and milestones, so it filters on the modified timestamp
+    instead of the creation date. Edits to older tickets and milestones now sync.
+
 ## [0.1.2] - 2026-03-06
 
 * [PR-12](https://github.com/ITK-Leantime/data-api/pull/12)
