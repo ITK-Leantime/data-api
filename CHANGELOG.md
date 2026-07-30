@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+* [PR-19](https://github.com/ITK-Leantime/data-api/pull/19)
+  * Validated request parameters, so malformed input answers 400 with a reason instead of failing with a 500.
+  * Rejected a limit below 1, which previously dropped the LIMIT clause and returned every row, and capped limit at 1000.
+  * Accepted comma separated ids, projectIds and types, since the endpoints are documented as GET with query parameters.
+  * Defaulted types to all supported types on the deleted endpoint, and stopped an unknown type reaching the error page.
+
 * [PR-18](https://github.com/ITK-Leantime/data-api/pull/18)
   * Allowed null values in API models, so entries referencing deleted users or deleted tickets no longer fail the whole request.
   * Added userId to timesheets, so hours logged by a deleted user stay attributable.
