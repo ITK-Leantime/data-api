@@ -5,6 +5,7 @@ namespace Leantime\Plugins\APIData\Tests\Service;
 use Carbon\CarbonInterface;
 use Leantime\Domain\Tickets\Repositories\Tickets as TicketRepository;
 use Leantime\Plugins\APIData\Repositories\ApiDataRepository;
+use Leantime\Plugins\APIData\Repositories\SchemaRepository;
 use Leantime\Plugins\APIData\Services\APIData;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -91,7 +92,7 @@ final class APIDataTest extends TestCase
         $repository = $this->createMock(ApiDataRepository::class);
         $repository->method('getTickets')->willReturn([$this->ticketRow(['projectId' => null])]);
 
-        $tickets = (new APIData($ticketRepository, $repository))->getTickets(0, 100);
+        $tickets = $this->makeService($repository, $ticketRepository)->getTickets(0, 100);
 
         $this->assertNull($tickets[0]->projectId);
         $this->assertNull($tickets[0]->status);
@@ -114,10 +115,45 @@ final class APIDataTest extends TestCase
             $this->ticketRow(['projectId' => 92, 'status' => 3]),
         ]);
 
-        $tickets = (new APIData($ticketRepository, $repository))->getTickets(0, 100);
+        $tickets = $this->makeService($repository, $ticketRepository)->getTickets(0, 100);
 
         $this->assertSame(92, $tickets[0]->projectId);
         $this->assertSame('NEW', $tickets[0]->status);
+    }
+
+    /**
+     * Users are the fourth entity type to carry a sync watermark. It comes from
+     * the plugin's own column, so it has to survive the mapping as UTC.
+     */
+    public function testGetWorkersMapsTheModifiedTimestampAsUtc(): void
+    {
+        $service = $this->makeServiceReturningWorkers([$this->workerRow()]);
+
+        $worker = $service->getWorkers(0, 100)[0];
+
+        $this->assertSame(57, $worker->id);
+        $this->assertSame('anne@aarhus.dk', $worker->email);
+        $this->assertSame('Anne Andersen', $worker->name);
+
+        $this->assertInstanceOf(CarbonInterface::class, $worker->modified);
+        $this->assertSame('2026-03-03 11:30:00', $worker->modified->format('Y-m-d H:i:s'));
+        $this->assertSame('UTC', $worker->modified->timezoneName);
+    }
+
+    /**
+     * `CONCAT(firstname, ' ', lastname)` is NULL when either column is, and one
+     * such user used to fail the whole /users response with a TypeError.
+     */
+    public function testGetWorkersMapsAUserWithoutANameToNull(): void
+    {
+        $service = $this->makeServiceReturningWorkers([
+            $this->workerRow(['name' => null, 'modified' => '0000-00-00 00:00:00']),
+        ]);
+
+        $worker = $service->getWorkers(0, 100)[0];
+
+        $this->assertNull($worker->name);
+        $this->assertNull($worker->modified);
     }
 
     /**
@@ -128,7 +164,27 @@ final class APIDataTest extends TestCase
         $repository = $this->createMock(ApiDataRepository::class);
         $repository->method('getTimesheets')->willReturn($rows);
 
-        return new APIData($this->createMock(TicketRepository::class), $repository);
+        return $this->makeService($repository);
+    }
+
+    /**
+     * @param list<object> $rows
+     */
+    private function makeServiceReturningWorkers(array $rows): APIData
+    {
+        $repository = $this->createMock(ApiDataRepository::class);
+        $repository->method('getWorkers')->willReturn($rows);
+
+        return $this->makeService($repository);
+    }
+
+    private function makeService(ApiDataRepository $repository, ?TicketRepository $ticketRepository = null): APIData
+    {
+        return new APIData(
+            $ticketRepository ?? $this->createMock(TicketRepository::class),
+            $repository,
+            $this->createMock(SchemaRepository::class),
+        );
     }
 
     /**
@@ -173,6 +229,22 @@ final class APIDataTest extends TestCase
             'dateToFinish' => null,
             'editTo' => null,
             'modified' => null,
+        ], $overrides);
+    }
+
+    /**
+     * A row as `ApiDataRepository::getWorkers()` returns it — `modified` is the
+     * aliased `itk_data_api_modified` column.
+     *
+     * @param array<string, mixed> $overrides
+     */
+    private function workerRow(array $overrides = []): object
+    {
+        return (object) array_merge([
+            'id' => 57,
+            'username' => 'anne@aarhus.dk',
+            'name' => 'Anne Andersen',
+            'modified' => '2026-03-03 11:30:00',
         ], $overrides);
     }
 

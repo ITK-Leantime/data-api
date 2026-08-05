@@ -4,15 +4,29 @@ An API plugin for exposing data to external applications.
 
 Copy the plugin to the folder app/Plugins/APIData, install and enable.
 
-During installation the following tables will be created to tracked deleted entities:
+## What installation changes in the database
+
+The following tables are created to track deleted entities:
 
 * itk_projects_deleted
 * itk_tickets_deleted
 * itk_timesheets_deleted
 
-3 triggers will also be installed that populate the tables when entities are deleted.
+3 triggers populate those tables when entities are deleted.
 
-NB! The triggers are removed on uninstall, but the tables are left alone to avoid data loss through install/uninstalls.
+An `itk_data_api_modified` column, with an index, is added to `zp_projects`, `zp_tickets`,
+`zp_timesheets` and `zp_user`, and 8 more triggers (insert and update, one pair per table) keep it
+current. This column exists because Leantime does not maintain its own `modified` column on every write
+path — time logged from the weekly grid, for instance, leaves it untouched. Since the triggers sit in the
+database, no write path can bypass them.
+
+The column is written as UTC, and `modifiedAfter` filters on it.
+
+NB! Installing stamps every existing row with the install time, so **the first sync after installing
+returns everything once**.
+
+NB! All 11 triggers are removed on uninstall, but the tables, the column and its data are left alone to
+avoid data loss through install/uninstalls.
 
 ## Endpoints
 
@@ -25,13 +39,14 @@ The API consists of the following endpoints:
 
 GET/POST: `https://{{YOUR_DOMAIN}}/apidata/api/{{TYPE}}`
 
-TYPE: projects, milestones, tickets, timesheets
+TYPE: projects, milestones, tickets, timesheets, users
 
 Attach query/body parameters to the request:
 
 * start: Starting id of the results.
 * limit: Maximum number of results to get from start id in ascending order.
 * modifiedAfter: Only retrieve entries that have a modified later than modifiedAfter (unix timestamp).
+  All five types, users included, carry a `modified` timestamp in the response.
 * ids: Array of ids to retrieve.
 * projectIds: Array of projectIds. Limits the entities to those attached to projects in projectIds.
   Only applies for types: milestone, tickets, timesheets.

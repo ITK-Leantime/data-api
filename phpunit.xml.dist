@@ -15,6 +15,7 @@
     <source>
         <include>
             <directory>Model</directory>
+            <directory>Repositories</directory>
             <directory>Services</directory>
         </include>
     </source>
