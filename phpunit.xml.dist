@@ -5,7 +5,12 @@
          cacheDirectory=".phpunit.cache"
          colors="true"
          failOnWarning="true"
-         failOnNotice="true">
+         failOnNotice="true"
+         failOnDeprecation="true"
+         failOnPhpunitDeprecation="true"
+         failOnPhpunitNotice="true"
+         displayDetailsOnTestsThatTriggerDeprecations="true"
+         displayDetailsOnPhpunitNotices="true">
     <testsuites>
         <testsuite name="APIData">
             <directory>tests</directory>

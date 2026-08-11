@@ -75,6 +75,31 @@ A parameter that cannot be interpreted answers `400` with the reason, e.g. a non
 {"error": "modifiedAfter must be a whole number."}
 ```
 
+## Development
+
+The plugin has no long-running stack, so everything runs in a one-off
+`itkdev/php8.3-fpm` container. Install [Task](https://taskfile.dev), then:
+
+```shell
+task setup
+task test
+task lint
+```
+
+Run `task --list-all` to see the remaining commands.
+
+The `Dockerfile` exists only for releases: `bin/create-release` needs `rsync`,
+which the base image does not carry. It backs the `php-release` compose service
+and is not used for tests or linting.
+
+Leantime core is not a Composer dependency of this plugin, so the development
+dependencies stand in for it. `illuminate/database` and `nesbot/carbon` are
+pinned to the exact versions the targeted Leantime release locks, so the tests
+run against the code Leantime itself runs — currently v3.9.7, which runs PHP 8.3
+and locks `laravel/framework v11.45.1` and `nesbot/carbon 3.10.1`. Bump those
+pins and re-check `tests/Stub/` against Leantime's own `composer.lock` when
+upgrading Leantime.
+
 ## API Key
 
 To use the plugin you need an API key for leantime.

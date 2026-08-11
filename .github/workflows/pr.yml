@@ -1,14 +1,19 @@
 on: pull_request
+
 name: Review
+
+# The checkout belongs to the runner, so the container writes to the bind mount
+# as `runner` rather than as the image's `deploy` user.
+env:
+  COMPOSE_USER: runner
+
 jobs:
   changelog:
     runs-on: ubuntu-latest
     name: Changelog should be updated
-    strategy:
-      fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Git fetch
         run: git fetch
@@ -19,21 +24,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     name: Unit tests
-    strategy:
-      fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      # Matches the PHP version in Dockerfile (itkdev/php8.3-fpm).
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          coverage: none
-
+      # Tests run in the project's own compose stack, so the PHP version comes
+      # from compose.yml rather than being repeated here.
       - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
+        run: docker compose run --rm --no-deps phpfpm composer install --no-interaction --prefer-dist --no-progress
 
       - name: Run tests
-        run: vendor/bin/phpunit
+        run: docker compose run --rm --no-deps phpfpm vendor/bin/phpunit
