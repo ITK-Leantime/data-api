@@ -74,12 +74,17 @@ class APIData
     {
         $values = $this->apiDataRepository->getTickets($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
-        return array_map(function ($value) {
+        // Tickets arrive in batches from the same handful of projects, so the
+        // labels are looked up once per project instead of once per ticket. Kept
+        // local to the call, since labels can change between requests.
+        $statusesByProject = [];
+
+        return array_map(function ($value) use (&$statusesByProject) {
             // Asked for labels without a project id, Leantime falls back to
             // session('currentProject'), which would resolve the status against
             // an unrelated project.
             $projectStatuses = $value->projectId !== null
-                ? $this->ticketRepository->getStateLabels($value->projectId)
+                ? $statusesByProject[$value->projectId] ??= $this->ticketRepository->getStateLabels($value->projectId)
                 : [];
 
             return new TicketData(

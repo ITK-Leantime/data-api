@@ -37,13 +37,18 @@ plugin_name="$plugin_name"
 # Configuration end
 
 git config --global --add safe.directory "$PWD"
-if ! git diff --exit-code composer.json; then
-  (>&2 echo; echo composer.json is changed. Aborting.)
+# Both files are restored with `git checkout` at the end, so refuse to run with
+# uncommitted changes in them.
+if ! git diff --exit-code composer.json composer.lock; then
+  (>&2 echo; echo composer.json or composer.lock is changed. Aborting.)
   exit 1
 fi
 
 # Make sure that `composer.json` has the correct version.
 composer config version "${tag}"
+# Writing the version invalidates the lock file's content hash, so refresh it to
+# keep `composer install` from warning about an out of date lock.
+composer update --lock --no-install --no-scripts
 
 # Script defined in local.create-release to build project-specific assets
 buildRelease
@@ -68,7 +73,7 @@ sha256sum "$name" >| checksum.txt
 # Clean up
 rm -fr "$release_dir"
 
-git checkout composer.json
+git checkout composer.json composer.lock
 
 echo
 echo "Release content ($name)"

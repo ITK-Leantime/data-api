@@ -10,9 +10,11 @@ use PHPUnit\Framework\TestCase;
 final class WorkerDataTest extends TestCase
 {
     /**
-     * The name is built with `CONCAT(firstname, ' ', lastname)`, and MySQL
-     * CONCAT returns NULL if any argument is NULL — both columns are nullable
-     * in Leantime v3.9.7, so a user without a surname has no name at all.
+     * `zp_user.username`, `.firstname` and `.lastname` are all `NOT NULL` in
+     * Leantime v3.9.7, so this is not a live TypeError. The name is still
+     * nullable on purpose: `ApiDataRepository::getWorkers()` maps an all-blank
+     * name to null rather than to a string of whitespace, and the remaining
+     * models in this namespace are nullable throughout.
      */
     public function testAcceptsNullNameAndEmail(): void
     {

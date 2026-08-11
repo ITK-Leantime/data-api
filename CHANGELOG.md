@@ -5,14 +5,17 @@
 * [PR-20](https://github.com/ITK-Leantime/data-api/pull/20)
   * Added a plugin owned `itk_data_api_modified` column, maintained by database triggers, on projects, tickets, timesheets and users, so no write path can leave the sync watermark behind.
   * Changed `modifiedAfter` to filter on that column, so edits to existing tickets and milestones are no longer missed and time logged from the weekly grid is picked up.
-  * Added `modified` to the users endpoint, and allowed null name and email for users without a surname.
+  * Added `modified` to the users endpoint.
   * Changed the deletion triggers to stamp `dateDeleted` in UTC, so `deleted` filters against the same clock the responses are read in.
   * Moved the schema handling into a SchemaRepository, executing one statement at a time so installation reports failures instead of swallowing them, and made installing idempotent.
 * [PR-18](https://github.com/ITK-Leantime/data-api/pull/18)
   * Allowed null values in API models, so entries referencing deleted users or deleted tickets no longer fail the whole request.
   * Added userId to timesheets, so hours logged by a deleted user stay attributable.
   * Stopped resolving ticket status against the session's project when a ticket has no project.
-  * Added PHPUnit test setup and a Taskfile for running it.
+  * Allowed a missing worker name, and stopped returning a whitespace-only name for a worker without one.
+  * Looked up ticket status labels once per project instead of once per ticket.
+  * Pinned the development dependencies to the Leantime release the plugin targets.
+  * Added PHPUnit test setup and a Taskfile for running it, and ran the tests in the project's Docker Compose stack on pull requests.
 
 ## [0.1.2] - 2026-03-06
 

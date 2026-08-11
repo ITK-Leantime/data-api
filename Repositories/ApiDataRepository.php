@@ -83,7 +83,10 @@ class ApiDataRepository
     {
         return $this->query()
             ->from("zp_user", "worker")
-            ->select(["worker.id", "worker.username", DB::raw("CONCAT(worker.firstname, ' ', worker.lastname) as name"), $this->modifiedSelect("worker")])
+            // CONCAT_WS skips a missing name part, so a worker with only a
+            // firstname keeps a usable name. NULLIF turns an all-blank name into
+            // null rather than a string of whitespace.
+            ->select(["worker.id", "worker.username", DB::raw("NULLIF(TRIM(CONCAT_WS(' ', worker.firstname, worker.lastname)), '') as name"), $this->modifiedSelect("worker")])
             ->where("worker.id", ">=", $startId)
             ->where("worker.source", "<>", "api")
             ->when($modifiedAfter !== null, fn ($query) => $query->where($this->modified("worker"), ">=", $this->cutoff($modifiedAfter)))
