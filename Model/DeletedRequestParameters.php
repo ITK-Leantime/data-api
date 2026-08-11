@@ -5,9 +5,11 @@ namespace Leantime\Plugins\APIData\Model;
 use Leantime\Plugins\APIData\Services\APIData;
 
 /**
- * The parameters for the deleted-entities endpoint. `types` used to be read
- * without a fallback, so leaving it out was a 500, and an unknown value reached
- * the repository's match arm, which reflected the raw input into the error page.
+ * The parameters for the deleted-entities endpoint. `types` is required: the
+ * endpoint has no limit, so each type returns its whole deletion history, and
+ * defaulting it would let a bare request scan every table. An unknown value used
+ * to reach the repository's match arm, which reflected the raw input into the
+ * error page.
  */
 readonly class DeletedRequestParameters
 {
@@ -63,13 +65,18 @@ readonly class DeletedRequestParameters
     {
         $types = self::toList($value, 'types');
 
-        if ($types === null) {
-            return self::supportedTypes();
+        // An empty list is rejected along with a missing one: it would otherwise
+        // answer 200 with nothing, which a caller reads as "nothing was deleted".
+        if ($types === null || $types === []) {
+            throw new BadRequestException(sprintf(
+                'types is required and must contain at least one of: %s.',
+                implode(', ', self::supportedTypes()),
+            ));
         }
 
         foreach ($types as $type) {
             if (!in_array($type, self::supportedTypes(), true)) {
-                throw new InvalidRequestException(sprintf(
+                throw new BadRequestException(sprintf(
                     'types must only contain: %s.',
                     implode(', ', self::supportedTypes()),
                 ));

@@ -2,7 +2,7 @@
 
 namespace Leantime\Plugins\APIData\Tests\Model;
 
-use Leantime\Plugins\APIData\Model\InvalidRequestException;
+use Leantime\Plugins\APIData\Model\BadRequestException;
 use Leantime\Plugins\APIData\Model\RequestParameters;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -44,14 +44,14 @@ final class RequestParametersTest extends TestCase
      */
     public function testANegativeLimitIsRejectedRatherThanReturningEveryRow(): void
     {
-        $this->expectException(InvalidRequestException::class);
+        $this->expectException(BadRequestException::class);
 
         RequestParameters::fromInput(['limit' => '-1']);
     }
 
     public function testAZeroLimitIsRejected(): void
     {
-        $this->expectException(InvalidRequestException::class);
+        $this->expectException(BadRequestException::class);
 
         RequestParameters::fromInput(['limit' => 0]);
     }
@@ -70,7 +70,7 @@ final class RequestParametersTest extends TestCase
 
     public function testANegativeStartIsRejected(): void
     {
-        $this->expectException(InvalidRequestException::class);
+        $this->expectException(BadRequestException::class);
 
         RequestParameters::fromInput(['start' => -5]);
     }
@@ -81,14 +81,14 @@ final class RequestParametersTest extends TestCase
      */
     public function testANonNumericTimestampIsRejectedInsteadOfCastingToZero(): void
     {
-        $this->expectException(InvalidRequestException::class);
+        $this->expectException(BadRequestException::class);
 
         RequestParameters::fromInput(['modifiedAfter' => 'yesterday']);
     }
 
     public function testAFractionalTimestampIsRejected(): void
     {
-        $this->expectException(InvalidRequestException::class);
+        $this->expectException(BadRequestException::class);
 
         RequestParameters::fromInput(['modifiedAfter' => '1761051213.5']);
     }
@@ -120,16 +120,26 @@ final class RequestParametersTest extends TestCase
         $this->assertSame([1, 2, 3], $parameters->ids);
     }
 
+    /**
+     * The comma separated form is trimmed, so `?ids[]=%201%20` has to be too.
+     */
+    public function testWhitespaceAroundArrayElementsIsIgnored(): void
+    {
+        $parameters = RequestParameters::fromInput(['ids' => [' 1 ', '2']]);
+
+        $this->assertSame([1, 2], $parameters->ids);
+    }
+
     public function testANonNumericIdIsRejected(): void
     {
-        $this->expectException(InvalidRequestException::class);
+        $this->expectException(BadRequestException::class);
 
         RequestParameters::fromInput(['ids' => '1,x,3']);
     }
 
     public function testANestedArrayOfIdsIsRejected(): void
     {
-        $this->expectException(InvalidRequestException::class);
+        $this->expectException(BadRequestException::class);
 
         RequestParameters::fromInput(['ids' => [[1, 2]]]);
     }
@@ -154,5 +164,16 @@ final class RequestParametersTest extends TestCase
         $parameters = RequestParameters::fromInput(['ids' => []]);
 
         $this->assertSame([], $parameters->ids);
+    }
+
+    /**
+     * The repository used to compare projectIds loosely, so an empty list dropped
+     * the filter and answered with every row instead of none.
+     */
+    public function testAnEmptyProjectIdsArrayStaysAnEmptyFilter(): void
+    {
+        $parameters = RequestParameters::fromInput(['projectIds' => []]);
+
+        $this->assertSame([], $parameters->projectIds);
     }
 }

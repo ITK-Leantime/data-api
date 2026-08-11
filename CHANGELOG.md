@@ -6,7 +6,10 @@
   * Validated request parameters, so malformed input answers 400 with a reason instead of failing with a 500.
   * Rejected a limit below 1, which previously dropped the LIMIT clause and returned every row, and capped limit at 1000.
   * Accepted comma separated ids, projectIds and types, since the endpoints are documented as GET with query parameters.
-  * Defaulted types to all supported types on the deleted endpoint, and stopped an unknown type reaching the error page.
+  * Required types on the deleted endpoint, so a bare request answers 400 instead of returning every deleted id ever recorded, and stopped an unknown type reaching the error page.
+  * Fixed an empty projectIds list dropping the filter, which answered with every row instead of none.
+  * Trimmed whitespace around ids, projectIds and types elements sent in array form.
+  * Renamed InvalidRequestException to BadRequestException, matching the 400 it turns into.
 
 * [PR-18](https://github.com/ITK-Leantime/data-api/pull/18)
   * Allowed null values in API models, so entries referencing deleted users or deleted tickets no longer fail the whole request.

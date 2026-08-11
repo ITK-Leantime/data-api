@@ -53,7 +53,8 @@ GET/POST: `https://{{YOUR_DOMAIN}}/apidata/api/deleted`
 Attach query/body parameters to the request:
 
 * types: Array of types to get deleted entities for: projects, milestones, tickets, timesheets.
-  Defaults to all four when left out, and a comma separated string is also accepted.
+  Required, and must name at least one type — each type returns its whole deletion history,
+  so there is no default. A comma separated string is also accepted, e.g. `?types=tickets,timesheets`.
 * deleted: Unix timestamp. Only retrieve ids of entities deleted after this timestamp.
 
 Example request:
@@ -68,7 +69,7 @@ curl https://leantime.local.itkdev.dk/apidata/api/deleted
 ## Errors
 
 A parameter that cannot be interpreted answers `400` with the reason, e.g. a non numeric
-`modifiedAfter`, a `limit` below 1, an id that is not a number, or an unknown `type`:
+`modifiedAfter`, a `limit` below 1, an id that is not a number, or a missing or unknown `type`:
 
 ```json
 {"error": "modifiedAfter must be a whole number."}

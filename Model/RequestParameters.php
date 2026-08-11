@@ -62,7 +62,7 @@ readonly class RequestParameters
         $limit = self::toNonNegativeInt($value, 'limit');
 
         if ($limit < 1) {
-            throw new InvalidRequestException('limit must be at least 1.');
+            throw new BadRequestException('limit must be at least 1.');
         }
 
         return min($limit, self::MAX_LIMIT);

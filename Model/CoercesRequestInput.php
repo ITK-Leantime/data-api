@@ -13,15 +13,15 @@ trait CoercesRequestInput
     private static function toNonNegativeInt(mixed $value, string $name): int
     {
         if (!is_int($value) && !(is_string($value) && is_numeric($value))) {
-            throw new InvalidRequestException(sprintf('%s must be a whole number.', $name));
+            throw new BadRequestException(sprintf('%s must be a whole number.', $name));
         }
 
         if ((float) $value !== (float) (int) $value) {
-            throw new InvalidRequestException(sprintf('%s must be a whole number.', $name));
+            throw new BadRequestException(sprintf('%s must be a whole number.', $name));
         }
 
         if ((int) $value < 0) {
-            throw new InvalidRequestException(sprintf('%s cannot be negative.', $name));
+            throw new BadRequestException(sprintf('%s cannot be negative.', $name));
         }
 
         return (int) $value;
@@ -51,17 +51,24 @@ trait CoercesRequestInput
         }
 
         if (is_array($value)) {
+            $elements = [];
+
             foreach ($value as $element) {
                 if (!is_scalar($element)) {
-                    throw new InvalidRequestException(sprintf('%s must be a list of values.', $name));
+                    throw new BadRequestException(sprintf('%s must be a list of values.', $name));
                 }
+
+                // Trimmed like the comma separated form, so ?types[]=tickets%20
+                // is not a 400 while ?types=tickets,%20timesheets works. Only
+                // strings, to leave a JSON body's integers as integers.
+                $elements[] = is_string($element) ? trim($element) : $element;
             }
 
-            return array_values($value);
+            return $elements;
         }
 
         if (!is_scalar($value)) {
-            throw new InvalidRequestException(sprintf('%s must be a list of values.', $name));
+            throw new BadRequestException(sprintf('%s must be a list of values.', $name));
         }
 
         $elements = array_filter(

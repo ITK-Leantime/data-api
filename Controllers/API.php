@@ -3,8 +3,8 @@
 namespace Leantime\Plugins\APIData\Controllers;
 
 use Leantime\Core\Controller\Controller;
+use Leantime\Plugins\APIData\Model\BadRequestException;
 use Leantime\Plugins\APIData\Model\DeletedRequestParameters;
-use Leantime\Plugins\APIData\Model\InvalidRequestException;
 use Leantime\Plugins\APIData\Model\RequestParameters;
 use Leantime\Plugins\APIData\Model\ResponseData;
 use Leantime\Plugins\APIData\Services\APIData;
@@ -60,7 +60,7 @@ class API extends Controller
     {
         try {
             return new JsonResponse($resolve());
-        } catch (InvalidRequestException $exception) {
+        } catch (BadRequestException $exception) {
             return new JsonResponse(['error' => $exception->getMessage()], JsonResponse::HTTP_BAD_REQUEST);
         }
     }

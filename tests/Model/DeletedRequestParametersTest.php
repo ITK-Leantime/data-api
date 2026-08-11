@@ -2,8 +2,8 @@
 
 namespace Leantime\Plugins\APIData\Tests\Model;
 
+use Leantime\Plugins\APIData\Model\BadRequestException;
 use Leantime\Plugins\APIData\Model\DeletedRequestParameters;
-use Leantime\Plugins\APIData\Model\InvalidRequestException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -11,20 +11,50 @@ use PHPUnit\Framework\TestCase;
 final class DeletedRequestParametersTest extends TestCase
 {
     /**
-     * `types` used to be read without a fallback, so omitting it was an undefined
-     * key followed by a foreach over null.
+     * The endpoint has no limit, so every type returns its whole deletion
+     * history. Omitting types used to be an undefined key followed by a foreach
+     * over null; it must not become a bare request that scans every table.
      */
-    public function testOmittingTypesFallsBackToEverySupportedType(): void
+    public function testOmittingTypesIsRejectedRatherThanScanningEveryTable(): void
     {
-        $parameters = DeletedRequestParameters::fromInput([]);
+        $this->expectException(BadRequestException::class);
+        $this->expectExceptionMessage('types is required and must contain at least one of: projects, milestones, tickets, timesheets.');
 
-        $this->assertSame(DeletedRequestParameters::supportedTypes(), $parameters->types);
-        $this->assertNull($parameters->deleted);
+        DeletedRequestParameters::fromInput([]);
+    }
+
+    /**
+     * An empty list would answer 200 with nothing, which a sync client reads as
+     * "nothing was deleted" and acts on.
+     */
+    public function testAnEmptyTypesListIsRejected(): void
+    {
+        $this->expectException(BadRequestException::class);
+
+        DeletedRequestParameters::fromInput(['types' => []]);
+    }
+
+    public function testAnEmptyTypesStringIsRejected(): void
+    {
+        $this->expectException(BadRequestException::class);
+
+        DeletedRequestParameters::fromInput(['types' => '']);
     }
 
     public function testACommaSeparatedListIsAcceptedForTypes(): void
     {
         $parameters = DeletedRequestParameters::fromInput(['types' => 'tickets, timesheets']);
+
+        $this->assertSame(['tickets', 'timesheets'], $parameters->types);
+    }
+
+    /**
+     * The comma separated form is trimmed, and types are matched strictly, so an
+     * untrimmed `?types[]=tickets%20` used to be a 400.
+     */
+    public function testWhitespaceAroundArrayElementsIsIgnored(): void
+    {
+        $parameters = DeletedRequestParameters::fromInput(['types' => [' tickets ', 'timesheets']]);
 
         $this->assertSame(['tickets', 'timesheets'], $parameters->types);
     }
@@ -42,7 +72,7 @@ final class DeletedRequestParametersTest extends TestCase
      */
     public function testAnUnknownTypeIsRejectedWithoutEchoingTheInput(): void
     {
-        $this->expectException(InvalidRequestException::class);
+        $this->expectException(BadRequestException::class);
         $this->expectExceptionMessage('types must only contain: projects, milestones, tickets, timesheets.');
 
         DeletedRequestParameters::fromInput(['types' => '<script>']);
@@ -54,22 +84,30 @@ final class DeletedRequestParametersTest extends TestCase
      */
     public function testUsersIsNotASupportedDeletedType(): void
     {
-        $this->expectException(InvalidRequestException::class);
+        $this->expectException(BadRequestException::class);
 
         DeletedRequestParameters::fromInput(['types' => 'users']);
     }
 
     public function testTheDeletedTimestampIsNarrowedToAnInteger(): void
     {
-        $parameters = DeletedRequestParameters::fromInput(['deleted' => '1759906882']);
+        $parameters = DeletedRequestParameters::fromInput(['types' => 'tickets', 'deleted' => '1759906882']);
 
         $this->assertSame(1759906882, $parameters->deleted);
     }
 
     public function testANonNumericDeletedTimestampIsRejected(): void
     {
-        $this->expectException(InvalidRequestException::class);
+        $this->expectException(BadRequestException::class);
+        $this->expectExceptionMessage('deleted must be a whole number.');
 
-        DeletedRequestParameters::fromInput(['deleted' => 'last week']);
+        DeletedRequestParameters::fromInput(['types' => 'tickets', 'deleted' => 'last week']);
+    }
+
+    public function testAnEmptyDeletedTimestampIsTreatedAsAbsent(): void
+    {
+        $parameters = DeletedRequestParameters::fromInput(['types' => 'tickets', 'deleted' => '']);
+
+        $this->assertNull($parameters->deleted);
     }
 }
