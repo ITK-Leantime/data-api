@@ -6,7 +6,10 @@
   * Allowed null values in API models, so entries referencing deleted users or deleted tickets no longer fail the whole request.
   * Added userId to timesheets, so hours logged by a deleted user stay attributable.
   * Stopped resolving ticket status against the session's project when a ticket has no project.
-  * Added PHPUnit test setup and a Taskfile for running it.
+  * Allowed a missing worker name, and stopped returning a whitespace-only name for a worker without one.
+  * Looked up ticket status labels once per project instead of once per ticket.
+  * Pinned the development dependencies to the Leantime release the plugin targets.
+  * Added PHPUnit test setup and a Taskfile for running it, and ran the tests in the project's Docker Compose stack on pull requests.
 
 ## [0.1.2] - 2026-03-06
 

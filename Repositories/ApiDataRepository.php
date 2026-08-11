@@ -28,7 +28,7 @@ class ApiDataRepository
             ->toArray();
     }
 
-    public function getMilestones(int $startId, int $limit, int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
+    public function getMilestones(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
             ->select(["id", "headline", "projectId", "modified"])
@@ -44,7 +44,7 @@ class ApiDataRepository
             ->toArray();
     }
 
-    public function getTickets(int $startId, int $limit, int $modifiedAfter = null, array $ids = null, ?array $projectIds = null): array
+    public function getTickets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
             ->select(["ticket.id", "ticket.headline", "ticket.projectId", "ticket.status", "ticket.planHours", "ticket.hourRemaining", "ticket.tags", "ticket.dateToFinish", "ticket.editTo", "ticket.milestoneid", "ticket.modified", "user.username"])
@@ -83,7 +83,10 @@ class ApiDataRepository
     {
         return $this->query()
             ->from("zp_user", "worker")
-            ->select(["worker.id", "worker.username", DB::raw("CONCAT(worker.firstname, ' ', worker.lastname) as name")])
+            // CONCAT_WS skips a missing name part, so a worker with only a
+            // firstname keeps a usable name. NULLIF turns an all-blank name into
+            // null rather than a string of whitespace.
+            ->select(["worker.id", "worker.username", DB::raw("NULLIF(TRIM(CONCAT_WS(' ', worker.firstname, worker.lastname)), '') as name")])
             ->where("worker.id", ">=", $startId)
             ->where("worker.source", "<>", "api")
             ->when($modifiedAfter !== null, fn ($query) => $query->where("worker.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))

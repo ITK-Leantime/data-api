@@ -88,7 +88,7 @@ final class APIDataTest extends TestCase
         $ticketRepository = $this->createMock(TicketRepository::class);
         $ticketRepository->expects($this->never())->method('getStateLabels');
 
-        $repository = $this->createMock(ApiDataRepository::class);
+        $repository = $this->createStub(ApiDataRepository::class);
         $repository->method('getTickets')->willReturn([$this->ticketRow(['projectId' => null])]);
 
         $tickets = (new APIData($ticketRepository, $repository))->getTickets(0, 100);
@@ -109,7 +109,7 @@ final class APIDataTest extends TestCase
             ->with(92)
             ->willReturn($this->stateLabels());
 
-        $repository = $this->createMock(ApiDataRepository::class);
+        $repository = $this->createStub(ApiDataRepository::class);
         $repository->method('getTickets')->willReturn([
             $this->ticketRow(['projectId' => 92, 'status' => 3]),
         ]);
@@ -121,14 +121,109 @@ final class APIDataTest extends TestCase
     }
 
     /**
+     * Tickets arrive in batches from a handful of projects, so the labels are
+     * looked up once per project rather than once per ticket.
+     */
+    public function testGetTicketsLooksUpStatusLabelsOncePerProject(): void
+    {
+        $ticketRepository = $this->createMock(TicketRepository::class);
+        $ticketRepository->expects($this->exactly(2))
+            ->method('getStateLabels')
+            ->willReturn($this->stateLabels());
+
+        $repository = $this->createStub(ApiDataRepository::class);
+        $repository->method('getTickets')->willReturn([
+            $this->ticketRow(['id' => 1, 'projectId' => 92]),
+            $this->ticketRow(['id' => 2, 'projectId' => 92]),
+            $this->ticketRow(['id' => 3, 'projectId' => 93]),
+        ]);
+
+        $tickets = (new APIData($ticketRepository, $repository))->getTickets(0, 100);
+
+        $this->assertCount(3, $tickets);
+        $this->assertSame('NEW', $tickets[0]->status);
+        $this->assertSame('NEW', $tickets[1]->status);
+    }
+
+    public function testGetWorkersMapsEveryFieldToItsOwnProperty(): void
+    {
+        $worker = $this->makeServiceReturningWorkers([$this->workerRow()])->getWorkers(0, 100)[0];
+
+        $this->assertSame(57, $worker->id);
+        $this->assertSame('anne@aarhus.dk', $worker->email);
+        $this->assertSame('Anne Andersen', $worker->name);
+    }
+
+    /**
+     * `ApiDataRepository::getWorkers()` maps an all-blank name to null, so the
+     * mapping has to carry that through instead of failing the whole request.
+     */
+    public function testGetWorkersMapsABlankNameToNull(): void
+    {
+        $worker = $this->makeServiceReturningWorkers([
+            $this->workerRow(['name' => null]),
+        ])->getWorkers(0, 100)[0];
+
+        $this->assertNull($worker->name);
+        $this->assertSame('anne@aarhus.dk', $worker->email);
+    }
+
+    public function testGetDeletedMapsEntryIdAndDeletedDate(): void
+    {
+        $deleted = $this->makeServiceReturningDeleted([$this->deletedRow()])
+            ->getDeleted(APIData::TYPE_TICKETS)[0];
+
+        $this->assertSame(4711, $deleted->id);
+        $this->assertInstanceOf(CarbonInterface::class, $deleted->deletedDate);
+        $this->assertSame('2026-03-04 08:15:00', $deleted->deletedDate->format('Y-m-d H:i:s'));
+        $this->assertSame('UTC', $deleted->deletedDate->timezoneName);
+    }
+
+    /**
+     * The delete triggers write `dateDeleted` through the same column type as the
+     * rest of Leantime, so the zero date sentinel has to be handled here too.
+     */
+    public function testGetDeletedTreatsTheZeroDateSentinelAsNull(): void
+    {
+        $deleted = $this->makeServiceReturningDeleted([
+            $this->deletedRow(['entryId' => null, 'dateDeleted' => '0000-00-00 00:00:00']),
+        ])->getDeleted(APIData::TYPE_TICKETS)[0];
+
+        $this->assertNull($deleted->id);
+        $this->assertNull($deleted->deletedDate);
+    }
+
+    /**
      * @param list<object> $rows
      */
     private function makeServiceReturningTimesheets(array $rows): APIData
     {
-        $repository = $this->createMock(ApiDataRepository::class);
+        $repository = $this->createStub(ApiDataRepository::class);
         $repository->method('getTimesheets')->willReturn($rows);
 
-        return new APIData($this->createMock(TicketRepository::class), $repository);
+        return new APIData($this->createStub(TicketRepository::class), $repository);
+    }
+
+    /**
+     * @param list<object> $rows
+     */
+    private function makeServiceReturningWorkers(array $rows): APIData
+    {
+        $repository = $this->createStub(ApiDataRepository::class);
+        $repository->method('getWorkers')->willReturn($rows);
+
+        return new APIData($this->createStub(TicketRepository::class), $repository);
+    }
+
+    /**
+     * @param list<object> $rows
+     */
+    private function makeServiceReturningDeleted(array $rows): APIData
+    {
+        $repository = $this->createStub(ApiDataRepository::class);
+        $repository->method('getDeleted')->willReturn($rows);
+
+        return new APIData($this->createStub(TicketRepository::class), $repository);
     }
 
     /**
@@ -173,6 +268,34 @@ final class APIDataTest extends TestCase
             'dateToFinish' => null,
             'editTo' => null,
             'modified' => null,
+        ], $overrides);
+    }
+
+    /**
+     * A row as `ApiDataRepository::getWorkers()` returns it. `name` is the
+     * `CONCAT_WS` expression from the select list, not a column.
+     *
+     * @param array<string, mixed> $overrides
+     */
+    private function workerRow(array $overrides = []): object
+    {
+        return (object) array_merge([
+            'id' => 57,
+            'username' => 'anne@aarhus.dk',
+            'name' => 'Anne Andersen',
+        ], $overrides);
+    }
+
+    /**
+     * A row as `ApiDataRepository::getDeleted()` returns it.
+     *
+     * @param array<string, mixed> $overrides
+     */
+    private function deletedRow(array $overrides = []): object
+    {
+        return (object) array_merge([
+            'entryId' => 4711,
+            'dateDeleted' => '2026-03-04 08:15:00',
         ], $overrides);
     }
 

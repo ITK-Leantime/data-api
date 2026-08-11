@@ -1,11 +1,13 @@
 *.tar.gz
+.claude
 .git*
+.idea
 .php-cs-fixer.dist.php
 .phpunit.cache
 .twig-cs-fixer.dist.php
 bin
 checksum.txt
-compose.yaml
+compose.yml
 composer.lock
 vendor
 Dockerfile

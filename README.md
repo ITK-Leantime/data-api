@@ -63,6 +63,27 @@ curl https://leantime.local.itkdev.dk/apidata/api/deleted
    -d '{"deleted":1759906882,"types":["projects","milestones","tickets","timesheets"]}'
 ```
 
+## Development
+
+The plugin has no long-running stack, so everything runs in a one-off container
+built from the local `Dockerfile`. Install [Task](https://taskfile.dev), then:
+
+```shell
+task setup
+task test
+task lint
+```
+
+Run `task --list-all` to see the remaining commands.
+
+Leantime core is not a Composer dependency of this plugin, so the development
+dependencies stand in for it. `illuminate/database` and `nesbot/carbon` are
+pinned to the exact versions the targeted Leantime release locks, so the tests
+run against the code Leantime itself runs — currently v3.9.7, which runs PHP 8.3
+and locks `laravel/framework v11.45.1` and `nesbot/carbon 3.10.1`. Bump those
+pins and re-check `tests/Stub/` against Leantime's own `composer.lock` when
+upgrading Leantime.
+
 ## API Key
 
 To use the plugin you need an API key for leantime.
