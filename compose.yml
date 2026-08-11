@@ -5,10 +5,8 @@ services:
     image: itkdev/php8.3-fpm:latest
     working_dir: /app
     # `deploy` is right locally, where Docker Desktop masks the ownership of the
-    # bind mount. On a Linux CI runner the checkout belongs to the runner's own
-    # uid, so CI sets COMPOSE_USER to it — otherwise composer cannot create
-    # `vendor`. The image carries a `runner` user at uid 1001, so the overridden
-    # uid still resolves to a writable home.
+    # bind mount. On a Linux CI runner the checkout belongs to `runner`, so CI
+    # sets COMPOSE_USER to it — otherwise composer cannot create `vendor`.
     user: ${COMPOSE_USER:-deploy}
     volumes:
       - .:/app

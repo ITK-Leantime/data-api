@@ -1,5 +1,12 @@
 on: pull_request
+
 name: Review
+
+# The checkout belongs to the runner, so the container writes to the bind mount
+# as `runner` rather than as the image's `deploy` user.
+env:
+  COMPOSE_USER: runner
+
 jobs:
   changelog:
     runs-on: ubuntu-latest
@@ -20,11 +27,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      # The checkout belongs to the runner's uid, so the container has to write
-      # to the bind mount as that uid rather than as the image's `deploy` user.
-      - name: Run the container as the checkout owner
-        run: echo "COMPOSE_USER=$(id -u):$(id -g)" >> "$GITHUB_ENV"
 
       # Tests run in the project's own compose stack, so the PHP version comes
       # from compose.yml rather than being repeated here.
