@@ -65,8 +65,8 @@ curl https://leantime.local.itkdev.dk/apidata/api/deleted
 
 ## Development
 
-The plugin has no long-running stack, so everything runs in a one-off container
-built from the local `Dockerfile`. Install [Task](https://taskfile.dev), then:
+The plugin has no long-running stack, so everything runs in a one-off
+`itkdev/php8.3-fpm` container. Install [Task](https://taskfile.dev), then:
 
 ```shell
 task setup
@@ -75,6 +75,10 @@ task lint
 ```
 
 Run `task --list-all` to see the remaining commands.
+
+The `Dockerfile` exists only for releases: `bin/create-release` needs `rsync`,
+which the base image does not carry. It backs the `php-release` compose service
+and is not used for tests or linting.
 
 Leantime core is not a Composer dependency of this plugin, so the development
 dependencies stand in for it. `illuminate/database` and `nesbot/carbon` are

@@ -2,7 +2,7 @@
 # Run `task` (or `task --list-all`) to see all available commands.
 #
 # This plugin has no long-running stack, so everything runs in a one-off
-# container built from the local Dockerfile (itkdev/php8.3-fpm).
+# itkdev/php8.3-fpm container.
 
 version: "3"
 
@@ -20,14 +20,14 @@ tasks:
   # -------------------------------------------------------------- Wrappers ---
 
   compose:
-    desc: "Run a docker compose command. Example: task compose -- build php."
+    desc: "Run a docker compose command. Example: task compose -- config."
     cmds:
       - "{{ .DOCKER_COMPOSE }} {{ .CLI_ARGS }}"
 
   php:
     desc: "Run a command in a one-off php container. Example: task php -- php --version."
     cmds:
-      - task compose -- run --rm --no-deps php {{ .CLI_ARGS }}
+      - task compose -- run --rm --no-deps phpfpm {{ .CLI_ARGS }}
     silent: true
 
   composer:
@@ -39,9 +39,8 @@ tasks:
   # ------------------------------------------------------------ Lifecycle ---
 
   setup:
-    desc: Build the php image and install dev dependencies.
+    desc: Install dev dependencies.
     cmds:
-      - task compose -- build php
       - task composer -- install
 
   # ------------------------------------------------------------ PHP tests ---

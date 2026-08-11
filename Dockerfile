@@ -2,7 +2,7 @@ FROM itkdev/php8.3-fpm:latest
 
 USER root
 
-# Add rsync
+# Add rsync, which `bin/create-release` needs and the base image does not carry.
 RUN apt-get update && apt-get --yes install rsync
 
 # Clean up

@@ -21,13 +21,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # Tests run in the project's own compose stack, so the PHP version comes
-      # from the Dockerfile rather than being repeated here.
-      - name: Build the php image
-        run: docker compose build php
+      # The checkout belongs to the runner's uid, so the container has to write
+      # to the bind mount as that uid rather than as the image's `deploy` user.
+      - name: Run the container as the checkout owner
+        run: echo "COMPOSE_USER=$(id -u):$(id -g)" >> "$GITHUB_ENV"
 
+      # Tests run in the project's own compose stack, so the PHP version comes
+      # from compose.yml rather than being repeated here.
       - name: Install dependencies
-        run: docker compose run --rm --no-deps php composer install --no-interaction --prefer-dist --no-progress
+        run: docker compose run --rm --no-deps phpfpm composer install --no-interaction --prefer-dist --no-progress
 
       - name: Run tests
-        run: docker compose run --rm --no-deps php vendor/bin/phpunit
+        run: docker compose run --rm --no-deps phpfpm vendor/bin/phpunit
