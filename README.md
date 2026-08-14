@@ -22,6 +22,14 @@ database, no write path can bypass them.
 
 The column is written as UTC, and `modifiedAfter` filters on it.
 
+The Leantime database user needs `ALTER` on `zp_projects`, `zp_tickets`, `zp_timesheets` and
+`zp_user`, on top of the `CREATE` and `TRIGGER` the plugin already needed. Installation fails, and
+says so, if the grant is missing.
+
+NB! Install and update the plugin with the site down. The triggers are absent while the plugin is
+being replaced, and an edit made in that window is not recoverable — installing only stamps rows that
+have no timestamp at all, which covers new rows and nothing else.
+
 NB! Installing stamps every existing row with the install time, so **the first sync after installing
 returns everything once**.
 

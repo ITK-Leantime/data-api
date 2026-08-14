@@ -8,6 +8,7 @@
   * Added `modified` to the users endpoint.
   * Changed the deletion triggers to stamp `dateDeleted` in UTC, so `deleted` filters against the same clock the responses are read in.
   * Moved the schema handling into a SchemaRepository, executing one statement at a time so installation reports failures instead of swallowing them, and made installing idempotent.
+  * Dropped the `dateDeleted` default on the deletion tables, so a row inserted without a trigger in place is left null rather than stamped with the server's local time.
 * [PR-18](https://github.com/ITK-Leantime/data-api/pull/18)
   * Allowed null values in API models, so entries referencing deleted users or deleted tickets no longer fail the whole request.
   * Added userId to timesheets, so hours logged by a deleted user stay attributable.

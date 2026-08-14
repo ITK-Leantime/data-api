@@ -155,6 +155,116 @@ final class SchemaRepositoryTest extends TestCase
     }
 
     /**
+     * The order the install sequence runs in is the whole argument for it: the
+     * triggers have to be in place before the backfill, or a row written between
+     * the two is missed by an UPDATE that has already passed it, and the index has
+     * to come after it, or it is built over an all-NULL column and then rewritten
+     * entry by entry.
+     */
+    public function testTheInstallSequenceStampsBeforeItIndexes(): void
+    {
+        $statements = SchemaRepository::installStatements('zp_timesheets', false, false);
+
+        $this->assertSame(
+            [
+                'ALTER TABLE `zp_timesheets` ADD COLUMN',
+                'DROP TRIGGER IF EXISTS',
+                'CREATE TRIGGER',
+                'DROP TRIGGER IF EXISTS',
+                'CREATE TRIGGER',
+                'UPDATE `zp_timesheets`',
+                'ALTER TABLE `zp_timesheets` ADD INDEX',
+            ],
+            array_map($this->kindOf(...), $statements),
+        );
+    }
+
+    /**
+     * Installation is also migration, so the second install has to skip what the
+     * first one created — but still re-create the triggers and re-run the backfill,
+     * which are the parts that heal a partial install.
+     */
+    #[DataProvider('columnAndIndexStates')]
+    public function testAlreadyInstalledSchemaIsNotAddedTwice(bool $hasColumn, bool $hasIndex): void
+    {
+        $statements = SchemaRepository::installStatements('zp_timesheets', $hasColumn, $hasIndex);
+
+        $this->assertSame(!$hasColumn, in_array('ALTER TABLE `zp_timesheets` ADD COLUMN', array_map($this->kindOf(...), $statements), true));
+        $this->assertSame(!$hasIndex, in_array('ALTER TABLE `zp_timesheets` ADD INDEX', array_map($this->kindOf(...), $statements), true));
+        $this->assertContains(SchemaRepository::backfillStatement('zp_timesheets'), $statements);
+
+        foreach (SchemaRepository::triggerStatements('zp_timesheets') as $statement) {
+            $this->assertContains($statement, $statements);
+        }
+    }
+
+    /**
+     * @return list<array{bool, bool}>
+     */
+    public static function columnAndIndexStates(): array
+    {
+        return [[false, false], [true, false], [false, true], [true, true]];
+    }
+
+    /**
+     * `CREATE TABLE IF NOT EXISTS` never reaches a database that already has the
+     * table, so a change expressed there alone would only ever apply to fresh
+     * installs. Every deleted table has to be carried by a statement both
+     * populations run.
+     */
+    public function testEveryDeletedTableColumnDefaultIsDroppedOnExistingInstallsToo(): void
+    {
+        $alters = SchemaRepository::deletedTableAlterStatements();
+
+        $this->assertCount(3, SchemaRepository::deletedTables());
+
+        foreach (SchemaRepository::deletedTables() as $table) {
+            $this->assertContains(
+                sprintf('ALTER TABLE `%s` ALTER COLUMN `dateDeleted` DROP DEFAULT', $table),
+                $alters,
+            );
+
+            $this->assertStringContainsString(
+                sprintf('CREATE TABLE IF NOT EXISTS `%s`', $table),
+                implode("\n", SchemaRepository::deletedTableStatements()),
+            );
+        }
+    }
+
+    /**
+     * The default writes the session timezone's clock into a column `/deleted`
+     * parses as UTC. The triggers make it unreachable, but the tables outlive an
+     * uninstall and the triggers do not.
+     */
+    public function testNoDeletedTableKeepsALocalTimeDefault(): void
+    {
+        foreach (SchemaRepository::deletedTableStatements() as $statement) {
+            if (!str_contains($statement, 'DEFAULT NOW()')) {
+                continue;
+            }
+
+            preg_match('/CREATE TABLE IF NOT EXISTS `([^`]+)`/', $statement, $matches);
+
+            $this->assertContains(
+                sprintf('ALTER TABLE `%s` ALTER COLUMN `dateDeleted` DROP DEFAULT', $matches[1] ?? ''),
+                SchemaRepository::deletedTableAlterStatements(),
+            );
+        }
+    }
+
+    /**
+     * Display width, deprecated since MySQL 8.0.17. Editing it in place is safe
+     * precisely because `int(11)` and `int` are the same column — the one kind of
+     * change to the frozen CREATEs that cannot make the two populations differ.
+     */
+    public function testTheDeletedTablesDoNotDeclareADisplayWidth(): void
+    {
+        foreach (SchemaRepository::deletedTableStatements() as $statement) {
+            $this->assertStringNotContainsString('int(11)', $statement);
+        }
+    }
+
+    /**
      * Only rows the triggers never saw are stamped, so re-installing does not
      * rewrite timestamps and force consumers through a second full resync.
      */
@@ -221,13 +331,12 @@ final class SchemaRepositoryTest extends TestCase
     {
         $statements = array_merge(
             SchemaRepository::deletedTableStatements(),
-            $this->allTriggerStatements(),
+            SchemaRepository::deletedTableAlterStatements(),
+            SchemaRepository::deleteTriggerStatements(),
         );
 
         foreach (SchemaRepository::TRACKED_TABLES as $table) {
-            $statements[] = SchemaRepository::addColumnStatement($table);
-            $statements[] = SchemaRepository::addIndexStatement($table);
-            $statements[] = SchemaRepository::backfillStatement($table);
+            array_push($statements, ...SchemaRepository::installStatements($table, false, false));
         }
 
         return $statements;
@@ -238,5 +347,24 @@ final class SchemaRepositoryTest extends TestCase
         preg_match('/^CREATE TRIGGER `([^`]+)`/', $statement, $matches);
 
         return $matches[1] ?? '';
+    }
+
+    /**
+     * A statement reduced to its opening clause, so an ordering assertion reads as
+     * a sequence rather than as five statements the other tests already pin.
+     */
+    private function kindOf(string $statement): string
+    {
+        if (str_starts_with($statement, 'DROP TRIGGER IF EXISTS')) {
+            return 'DROP TRIGGER IF EXISTS';
+        }
+
+        if (str_starts_with($statement, 'CREATE TRIGGER')) {
+            return 'CREATE TRIGGER';
+        }
+
+        preg_match('/^(ALTER TABLE `[^`]+` ADD (?:COLUMN|INDEX)|UPDATE `[^`]+`)/', $statement, $matches);
+
+        return $matches[1] ?? $statement;
     }
 }

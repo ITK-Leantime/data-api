@@ -21,6 +21,11 @@ use Illuminate\Database\Query\Builder;
  *   `ADD COLUMN IF NOT EXISTS` — both are MariaDB-only.
  * - Every timestamp is `UTC_TIMESTAMP()`, never `NOW()`, which would write the
  *   session timezone's clock and reintroduce the ambiguity we are fixing.
+ *
+ * Installing and updating the plugin happens with the site down. That precondition
+ * is load-bearing: while the plugin is being replaced its triggers are gone, and
+ * an edit landing in that window is lost for good. The backfill only stamps rows
+ * that have no timestamp at all, so it recovers inserts and nothing else.
  */
 class SchemaRepository
 {
@@ -43,21 +48,15 @@ class SchemaRepository
     public function install(): void
     {
         $this->execute(...self::deletedTableStatements());
+        $this->execute(...self::deletedTableAlterStatements());
         $this->execute(...self::deleteTriggerStatements());
 
         foreach (self::TRACKED_TABLES as $table) {
-            if (!$this->hasColumn($table, self::COLUMN)) {
-                $this->execute(self::addColumnStatement($table));
-            }
-
-            if (!$this->hasIndex($table, self::INDEX)) {
-                $this->execute(self::addIndexStatement($table));
-            }
-
-            // Triggers first, so rows written between here and the backfill are
-            // stamped by the trigger rather than left behind.
-            $this->execute(...self::triggerStatements($table));
-            $this->execute(self::backfillStatement($table));
+            $this->execute(...self::installStatements(
+                $table,
+                $this->hasColumn($table, self::COLUMN),
+                $this->hasIndex($table, self::INDEX),
+            ));
         }
     }
 
@@ -67,6 +66,37 @@ class SchemaRepository
         // a reinstall then preserves timestamp history instead of forcing every
         // consumer through another full resync.
         $this->execute(...self::uninstallStatements());
+    }
+
+    /**
+     * The per-table install sequence, in the order it has to run.
+     *
+     * The triggers precede the backfill so a row written between the two is
+     * stamped by the trigger rather than missed by an UPDATE that has already
+     * passed it. The index goes last: built any earlier it would index an
+     * all-NULL column and then have every entry rewritten by the backfill.
+     *
+     * The column and index are guarded because installing is also migrating —
+     * Leantime has no upgrade hook, so this runs again on every install.
+     *
+     * @return list<string>
+     */
+    public static function installStatements(string $table, bool $hasColumn, bool $hasIndex): array
+    {
+        $statements = [];
+
+        if (!$hasColumn) {
+            $statements[] = self::addColumnStatement($table);
+        }
+
+        array_push($statements, ...self::triggerStatements($table));
+        $statements[] = self::backfillStatement($table);
+
+        if (!$hasIndex) {
+            $statements[] = self::addIndexStatement($table);
+        }
+
+        return $statements;
     }
 
     /**
@@ -90,9 +120,9 @@ class SchemaRepository
     }
 
     /**
-     * Runs on every install, not just the first. On an existing install it is a
-     * no-op except for rows written while the plugin was uninstalled and the
-     * triggers were gone — which it heals.
+     * Stamps the rows the triggers never saw. Runs on every install, not just the
+     * first, but `IS NULL` keeps it from rewriting timestamps a previous install
+     * already set and forcing consumers through a second full resync.
      */
     public static function backfillStatement(string $table): string
     {
@@ -158,10 +188,15 @@ class SchemaRepository
     }
 
     /**
-     * Left exactly as they were first shipped: IF NOT EXISTS makes these no-ops
-     * on every existing install, so changing them here would only make fresh
-     * databases differ. The `DEFAULT NOW()` on `dateDeleted` is unreachable now
-     * that the delete triggers set the column themselves.
+     * The historical baseline, frozen. `CREATE TABLE IF NOT EXISTS` is a bootstrap
+     * rather than a declaration: a database that already has the table ignores it
+     * forever, so editing a body here only changes what fresh installs get and lets
+     * the two populations drift apart silently. Every later change belongs in
+     * `deletedTableAlterStatements()`, which both populations run.
+     *
+     * The one exception is a change that produces an identical column either way —
+     * `int(11)` lost its display width here, since `int(11)` and `int` are the same
+     * column and only the former emits an 8.0.17 deprecation.
      *
      * @return list<string>
      */
@@ -169,27 +204,60 @@ class SchemaRepository
     {
         return [
             'CREATE TABLE IF NOT EXISTS `itk_projects_deleted` (
-                `id` int(11) NOT NULL AUTO_INCREMENT,
-                `entryId` int(11) DEFAULT NULL,
+                `id` int NOT NULL AUTO_INCREMENT,
+                `entryId` int DEFAULT NULL,
                 `dateDeleted` datetime DEFAULT NOW(),
                 PRIMARY KEY (`id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
 
             'CREATE TABLE IF NOT EXISTS `itk_tickets_deleted` (
-                `id` int(11) NOT NULL AUTO_INCREMENT,
-                `entryId` int(11) DEFAULT NULL,
+                `id` int NOT NULL AUTO_INCREMENT,
+                `entryId` int DEFAULT NULL,
                 `type` varchar(255) DEFAULT NULL,
                 `dateDeleted` datetime DEFAULT NOW(),
                 PRIMARY KEY (`id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
 
             'CREATE TABLE IF NOT EXISTS `itk_timesheets_deleted` (
-                `id` int(11) NOT NULL AUTO_INCREMENT,
-                `entryId` int(11) DEFAULT NULL,
+                `id` int NOT NULL AUTO_INCREMENT,
+                `entryId` int DEFAULT NULL,
                 `dateDeleted` datetime DEFAULT NOW(),
                 PRIMARY KEY (`id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
         ];
+    }
+
+    /**
+     * Changes to the deleted tables made after their original CREATE, expressed so
+     * that existing databases converge on what a fresh install gets. Re-running one
+     * has to be safe; `hasColumn()`/`hasIndex()` are there for the changes that
+     * cannot express that in SQL alone.
+     *
+     * Dropping `dateDeleted`'s default is the first of them. The delete triggers set
+     * the column themselves, so `DEFAULT NOW()` is unreachable while they exist —
+     * but the tables outlive an uninstall and the triggers do not. Without the
+     * default, a row inserted with no trigger in place gets a NULL instead of the
+     * session timezone's clock in a column the read side parses as UTC.
+     *
+     * @return list<string>
+     */
+    public static function deletedTableAlterStatements(): array
+    {
+        return array_map(
+            static fn (string $table) => sprintf(
+                'ALTER TABLE `%s` ALTER COLUMN `dateDeleted` DROP DEFAULT',
+                $table,
+            ),
+            self::deletedTables(),
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function deletedTables(): array
+    {
+        return array_values(array_unique(array_column(self::DELETE_TRIGGERS, 1)));
     }
 
     /**
