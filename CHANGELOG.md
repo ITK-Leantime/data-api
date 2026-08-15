@@ -9,6 +9,14 @@
   * Changed the deletion triggers to stamp `dateDeleted` in UTC, so `deleted` filters against the same clock the responses are read in.
   * Moved the schema handling into a SchemaRepository, executing one statement at a time so installation reports failures instead of swallowing them, and made installing idempotent.
   * Dropped the `dateDeleted` default on the deletion tables, so a row inserted without a trigger in place is left null rather than stamped with the server's local time.
+* [PR-19](https://github.com/ITK-Leantime/data-api/pull/19)
+  * Validated request parameters, so malformed input answers 400 with a reason instead of failing with a 500.
+  * Rejected a limit below 1, which previously dropped the LIMIT clause and returned every row, and capped limit at 1000.
+  * Accepted comma separated ids, projectIds and types, since the endpoints are documented as GET with query parameters.
+  * Required types on the deleted endpoint, so a bare request answers 400 instead of returning every deleted id ever recorded, and stopped an unknown type reaching the error page.
+  * Fixed an empty projectIds list dropping the filter, which answered with every row instead of none.
+  * Trimmed whitespace around ids, projectIds and types elements sent in array form.
+  * Renamed InvalidRequestException to BadRequestException, matching the 400 it turns into.
 * [PR-18](https://github.com/ITK-Leantime/data-api/pull/18)
   * Allowed null values in API models, so entries referencing deleted users or deleted tickets no longer fail the whole request.
   * Added userId to timesheets, so hours logged by a deleted user stay attributable.
