@@ -30,9 +30,10 @@ TYPE: projects, milestones, tickets, timesheets
 Attach query/body parameters to the request:
 
 * start: Starting id of the results.
-* limit: Maximum number of results to get from start id in ascending order.
+* limit: Maximum number of results to get from start id in ascending order. Must be at least 1,
+  and is capped at 1000. The limit that was actually applied is echoed in `parameters`.
 * modifiedAfter: Only retrieve entries that have a modified later than modifiedAfter (unix timestamp).
-* ids: Array of ids to retrieve.
+* ids: Array of ids to retrieve. A comma separated string is also accepted, e.g. `?ids=1,2,3`.
 * projectIds: Array of projectIds. Limits the entities to those attached to projects in projectIds.
   Only applies for types: milestone, tickets, timesheets.
 
@@ -52,6 +53,8 @@ GET/POST: `https://{{YOUR_DOMAIN}}/apidata/api/deleted`
 Attach query/body parameters to the request:
 
 * types: Array of types to get deleted entities for: projects, milestones, tickets, timesheets.
+  Required, and must name at least one type — each type returns its whole deletion history,
+  so there is no default. A comma separated string is also accepted, e.g. `?types=tickets,timesheets`.
 * deleted: Unix timestamp. Only retrieve ids of entities deleted after this timestamp.
 
 Example request:
@@ -61,6 +64,15 @@ curl https://leantime.local.itkdev.dk/apidata/api/deleted
    -H "x-api-key: lt_1234567890"
    -H "Content-Type: application/json"
    -d '{"deleted":1759906882,"types":["projects","milestones","tickets","timesheets"]}'
+```
+
+## Errors
+
+A parameter that cannot be interpreted answers `400` with the reason, e.g. a non numeric
+`modifiedAfter`, a `limit` below 1, an id that is not a number, or a missing or unknown `type`:
+
+```json
+{"error": "modifiedAfter must be a whole number."}
 ```
 
 ## Development
