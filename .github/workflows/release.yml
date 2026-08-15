@@ -14,7 +14,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build and create release
         env:
@@ -34,7 +34,7 @@ jobs:
             release_name="release-${tag_name}"
           fi
 
-          docker compose run --user root --rm php bin/create-release "$tag_name"
+          docker compose run --user root --rm php-release bin/create-release "$tag_name"
 
           # Delete release if it already exists.
           gh release view "$release_name" > /dev/null 2>&1 && gh release delete "$release_name" --yes

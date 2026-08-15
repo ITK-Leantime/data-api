@@ -125,7 +125,7 @@ class APIData
         }, $values);
     }
 
-    public function getMilestones(int $startId, int $limit, int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
+    public function getMilestones(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getMilestones($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
@@ -139,12 +139,22 @@ class APIData
         }, $values);
     }
 
-    public function getTickets(int $startId, int $limit, int $modifiedAfter = null, array $ids = null, ?array $projectIds = null): array
+    public function getTickets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getTickets($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
-        return array_map(function ($value) {
-            $projectStatuses = $this->ticketRepository->getStateLabels($value->projectId);
+        // Tickets arrive in batches from the same handful of projects, so the
+        // labels are looked up once per project instead of once per ticket. Kept
+        // local to the call, since labels can change between requests.
+        $statusesByProject = [];
+
+        return array_map(function ($value) use (&$statusesByProject) {
+            // Asked for labels without a project id, Leantime falls back to
+            // session('currentProject'), which would resolve the status against
+            // an unrelated project.
+            $projectStatuses = $value->projectId !== null
+                ? $statusesByProject[$value->projectId] ??= $this->ticketRepository->getStateLabels($value->projectId)
+                : [];
 
             return new TicketData(
                 $value->id,
@@ -168,16 +178,20 @@ class APIData
         $values = $this->apiDataRepository->getTimesheets($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
         return array_map(function ($value) {
+            // Named arguments: CarbonImmutable has a __toString(), so a
+            // mis-ordered date would be coerced into one of the string
+            // parameters instead of raising a TypeError.
             return new TimesheetData(
-                $value->id,
-                $value->ticketId,
-                $value->projectId,
-                $value->description,
-                $value->hours,
-                $value->username,
-                $this->getCarbonFromDatabaseValue($value->workDate),
-                $this->getCarbonFromDatabaseValue($value->modified),
-                $value->kind,
+                id: $value->id,
+                ticketId: $value->ticketId,
+                projectId: $value->projectId,
+                description: $value->description,
+                hours: $value->hours,
+                userId: $value->userId,
+                username: $value->username,
+                kind: $value->kind,
+                workDate: $this->getCarbonFromDatabaseValue($value->workDate),
+                modified: $this->getCarbonFromDatabaseValue($value->modified),
             );
         }, $values);
     }
