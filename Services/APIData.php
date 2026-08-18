@@ -12,6 +12,7 @@ use Leantime\Plugins\APIData\Model\TicketData;
 use Leantime\Plugins\APIData\Model\TimesheetData;
 use Leantime\Plugins\APIData\Model\WorkerData;
 use Leantime\Plugins\APIData\Repositories\ApiDataRepository;
+use Leantime\Plugins\APIData\Repositories\SchemaRepository;
 
 class APIData
 {
@@ -25,91 +26,21 @@ class APIData
     public function __construct(
         private readonly TicketRepository $ticketRepository,
         private readonly ApiDataRepository $apiDataRepository,
+        private readonly SchemaRepository $schemaRepository,
     ) {}
 
+    /**
+     * Leantime calls this on every install, and offers no separate upgrade hook,
+     * so SchemaRepository::install() has to be idempotent.
+     */
     public function install(): void
     {
-        $sql = "
-        CREATE TABLE IF NOT EXISTS `itk_projects_deleted` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `entryId` int(11) DEFAULT NULL,
-            `dateDeleted` datetime DEFAULT NOW(),
-            PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TABLE IF NOT EXISTS `itk_tickets_deleted` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `entryId` int(11) DEFAULT NULL,
-            `type` varchar(255) DEFAULT NULL,
-            `dateDeleted` datetime DEFAULT NOW(),
-            PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TABLE IF NOT EXISTS `itk_timesheets_deleted` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `entryId` int(11) DEFAULT NULL,
-            `dateDeleted` datetime DEFAULT NOW(),
-            PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TRIGGER itk_projects_deleted_trigger
-        AFTER DELETE ON zp_projects
-        FOR EACH ROW
-        BEGIN
-           INSERT INTO itk_projects_deleted(entryId)
-           VALUES (OLD.id);
-        END;
-
-        CREATE TRIGGER itk_tickets_deleted_trigger
-        AFTER DELETE ON zp_tickets
-        FOR EACH ROW
-        BEGIN
-           INSERT INTO itk_tickets_deleted(entryId, type)
-           VALUES (OLD.id, OLD.type);
-        END;
-
-        CREATE TRIGGER itk_timesheets_deleted_trigger
-        AFTER DELETE ON zp_timesheets
-        FOR EACH ROW
-        BEGIN
-           INSERT INTO itk_timesheets_deleted(entryId)
-           VALUES (OLD.id);
-        END;
-        ";
-
-        // Use PDO for multi-statement SQL with parameter binding
-        // We need to use PDO directly because Laravel's statement() method
-        // may not handle multi-statement SQL properly
-        $pdo = app('db')->connection()->getPdo();
-        $stmn = $pdo->prepare($sql);
-
-        $stmn->execute();
-
-        $stmn->closeCursor();
+        $this->schemaRepository->install();
     }
 
     public function uninstall(): void
     {
-        $sql = "
-        DROP TRIGGER itk_projects_deleted_trigger;
-        DROP TRIGGER itk_tickets_deleted_trigger;
-        DROP TRIGGER itk_timesheets_deleted_trigger;
-        ";
-
-        // Tables are not remove, to preserve data through install/uninstalls.
-        // DROP TABLE `itk_projects_deleted`;
-        // DROP TABLE `itk_tickets_deleted`;
-        // DROP TABLE `itk_timesheets_deleted`;
-
-        // Use PDO for multi-statement SQL with parameter binding
-        // We need to use PDO directly because Laravel's statement() method
-        // may not handle multi-statement SQL properly
-        $pdo = app('db')->connection()->getPdo();
-        $stmn = $pdo->prepare($sql);
-
-        $stmn->execute();
-
-        $stmn->closeCursor();
+        $this->schemaRepository->uninstall();
     }
 
     public function getProjects(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
@@ -196,15 +127,16 @@ class APIData
         }, $values);
     }
 
-    public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
+    public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
-        $values = $this->apiDataRepository->getWorkers($startId, $limit, $modifiedAfter, $ids, $projectIds);
+        $values = $this->apiDataRepository->getWorkers($startId, $limit, $modifiedAfter, $ids);
 
         return array_map(function ($value) {
             return new WorkerData(
-                $value->id,
-                $value->username,
-                $value->name,
+                id: $value->id,
+                email: $value->username,
+                name: $value->name,
+                modified: $this->getCarbonFromDatabaseValue($value->modified),
             );
         }, $values);
     }

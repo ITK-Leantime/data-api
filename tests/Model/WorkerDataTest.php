@@ -18,10 +18,11 @@ final class WorkerDataTest extends TestCase
      */
     public function testAcceptsNullNameAndEmail(): void
     {
-        $worker = new WorkerData(id: 57, email: null, name: null);
+        $worker = new WorkerData(id: 57, email: null, name: null, modified: null);
 
         $this->assertSame(57, $worker->id);
         $this->assertNull($worker->email);
         $this->assertNull($worker->name);
+        $this->assertNull($worker->modified);
     }
 }
