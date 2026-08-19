@@ -31,6 +31,7 @@ readonly class DeletedRequestParameters
      */
     public static function fromInput(array $input): self
     {
+        self::rejectTheOldTypesName($input);
         self::rejectTheOldDeletedName($input);
 
         return new self(
@@ -70,6 +71,21 @@ readonly class DeletedRequestParameters
     }
 
     /**
+     * `types` took a list until the endpoint was narrowed to serving one type per
+     * request. A caller still sending it has no `type` at all, so without this it
+     * would be turned away by the generic "type is required" — true, but silent
+     * about the one thing it needs to change.
+     *
+     * @param array<string, mixed> $input
+     */
+    private static function rejectTheOldTypesName(array $input): void
+    {
+        if (self::wasSent($input['types'] ?? null)) {
+            throw new BadRequestException('types has been replaced by type, which names exactly one type.');
+        }
+    }
+
+    /**
      * `deleted` was this parameter's name until it was aligned with the entity
      * endpoints' `modifiedAfter`. Ignoring it would answer with the whole deletion
      * history while the caller believes it asked for a window — which is exactly
@@ -79,18 +95,31 @@ readonly class DeletedRequestParameters
      */
     private static function rejectTheOldDeletedName(array $input): void
     {
-        $value = $input['deleted'] ?? null;
-
-        if ($value !== null && $value !== '') {
+        if (self::wasSent($input['deleted'] ?? null)) {
             throw new BadRequestException('deleted has been renamed to deletedAfter.');
         }
     }
 
+    /**
+     * A retired parameter is only worth failing over when it carries something.
+     * An empty value means it was never really sent — a bare `?deleted=` or
+     * `?types[]=` is what a query string leaves behind, not a request for the old
+     * behaviour.
+     */
+    private static function wasSent(mixed $value): bool
+    {
+        if (is_array($value)) {
+            return [] !== array_filter($value, fn ($element) => $element !== null && $element !== '');
+        }
+
+        return $value !== null && $value !== '';
+    }
+
     private static function toType(mixed $value): string
     {
-        // A list is rejected rather than reduced to its first element: the
-        // endpoint used to accept `types`, and a caller still sending one would
-        // otherwise get a page of a type it did not ask about.
+        // `type[]=tickets&type[]=timesheets` is rejected rather than reduced to
+        // its first element, which would answer with a page of a type the caller
+        // did not ask about. The retired `types` name is caught earlier.
         if (is_array($value)) {
             throw new BadRequestException('type must be a single value.');
         }

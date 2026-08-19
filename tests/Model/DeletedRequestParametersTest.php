@@ -5,6 +5,7 @@ namespace Leantime\Plugins\APIData\Tests\Model;
 use Leantime\Plugins\APIData\Model\BadRequestException;
 use Leantime\Plugins\APIData\Model\DeletedRequestParameters;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(DeletedRequestParameters::class)]
@@ -30,8 +31,8 @@ final class DeletedRequestParametersTest extends TestCase
     }
 
     /**
-     * The endpoint took a `types` list before it was paginated. A caller still
-     * sending one must be told, not quietly served whichever type came first.
+     * `type[]=tickets&type[]=timesheets` is a caller asking for two pages at once.
+     * Reducing it to the first element would serve a type it did not ask about.
      */
     public function testAListOfTypesIsRejected(): void
     {
@@ -179,6 +180,67 @@ final class DeletedRequestParametersTest extends TestCase
         $parameters = DeletedRequestParameters::fromInput(['type' => 'tickets', 'deleted' => '']);
 
         $this->assertNull($parameters->deletedAfter);
+    }
+
+    /**
+     * A caller still sending `types` has no `type`, so it would otherwise be met
+     * with "type is required" — accurate, but silent about the rename that is the
+     * only thing it has to act on.
+     */
+    public function testTheOldTypesNameIsRejectedByName(): void
+    {
+        $this->expectException(BadRequestException::class);
+        $this->expectExceptionMessage('types has been replaced by type, which names exactly one type.');
+
+        DeletedRequestParameters::fromInput(['types' => 'tickets']);
+    }
+
+    /**
+     * The list form is what `types` was for, so it is the shape the old consumer
+     * actually sends.
+     */
+    public function testTheOldTypesNameIsRejectedWhenSentAsAList(): void
+    {
+        $this->expectException(BadRequestException::class);
+        $this->expectExceptionMessage('types has been replaced by type, which names exactly one type.');
+
+        DeletedRequestParameters::fromInput(['types' => ['tickets', 'timesheets']]);
+    }
+
+    /**
+     * Named alongside a valid `type` it is still the old parameter, and answering
+     * on the new one would leave the caller believing both are understood.
+     */
+    public function testTheOldTypesNameIsRejectedEvenWhenTypeIsAlsoGiven(): void
+    {
+        $this->expectException(BadRequestException::class);
+
+        DeletedRequestParameters::fromInput(['type' => 'tickets', 'types' => 'tickets']);
+    }
+
+    /**
+     * An empty value means the parameter was never really sent — `?types=` and
+     * `?types[]=` are what a query string leaves behind, not a request for the
+     * old behaviour.
+     */
+    #[DataProvider('emptyTypesValues')]
+    public function testAnEmptyOldTypesValueIsTreatedAsAbsent(mixed $types): void
+    {
+        $parameters = DeletedRequestParameters::fromInput(['type' => 'tickets', 'types' => $types]);
+
+        $this->assertSame('tickets', $parameters->type);
+    }
+
+    /**
+     * @return array<string, array{mixed}>
+     */
+    public static function emptyTypesValues(): array
+    {
+        return [
+            'empty string' => [''],
+            'empty list' => [[]],
+            'list of one empty string' => [['']],
+        ];
     }
 
     /**

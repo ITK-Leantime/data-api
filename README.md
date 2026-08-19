@@ -76,8 +76,8 @@ GET/POST: `https://{{YOUR_DOMAIN}}/apidata/api/deleted`
 Attach query/body parameters to the request:
 
 * type: The type to get deleted entities for: projects, milestones, tickets or timesheets.
-  Required, and names exactly one type — a list is rejected. (`users` is not available:
-  Leantime keeps no record of deleted users.)
+  Required, and names exactly one type — a list is rejected, as is the `types` parameter this
+  replaced. (`users` is not available: Leantime keeps no record of deleted users.)
 * start: Starting deletionId of the results.
 * limit: Maximum number of results to get from start deletionId in ascending order. Must be at
   least 1, and is capped at 1000. The limit that was actually applied is echoed in `parameters`.
@@ -86,7 +86,16 @@ Attach query/body parameters to the request:
 Each result carries a `deletionId` alongside the deleted entity's `id`. Deletions are appended
 in the order they happen, so `deletionId` — not `id` — is what the results are ordered and paged
 on: request the next page with `start` set to the highest `deletionId` you got plus one, for as
-long as `resultsCount` equals the `limit` you asked for.
+long as `resultsCount` equals `parameters.limit`. Compare against the limit in the response, not
+the one you sent: a request above the cap is answered with the capped limit, and a client that
+compares against its own 5000 would stop at the first page.
+
+NB! `start` is a watermark, not a gap-free cursor. A `deletionId` is assigned when the deletion is
+written, but the row only becomes visible when its transaction commits, so a deletion can appear
+below a `deletionId` you have already read past — and `deletedAfter`, stamped at the same moment,
+moves with it. A consumer that must not miss a deletion should therefore not carry `start` from one
+sync run to the next: begin each run at `start=0` with `deletedAfter` set a little before the
+previous run started, and ignore the `deletionId`s it has already seen.
 
 Example request:
 
