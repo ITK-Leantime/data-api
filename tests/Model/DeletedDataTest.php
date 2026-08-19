@@ -17,9 +17,22 @@ final class DeletedDataTest extends TestCase
      */
     public function testAcceptsNullIdAndDeletedDate(): void
     {
-        $deleted = new DeletedData(id: null, deletedDate: null);
+        $deleted = new DeletedData(deletionId: null, id: null, deletedDate: null);
 
+        $this->assertNull($deleted->deletionId);
         $this->assertNull($deleted->id);
         $this->assertNull($deleted->deletedDate);
+    }
+
+    /**
+     * `deletionId` is what a client pages on, so it is a field of its own rather
+     * than a reuse of `id`, which carries the deleted entity's id.
+     */
+    public function testCarriesTheDeletionIdAlongsideTheDeletedEntityId(): void
+    {
+        $deleted = new DeletedData(deletionId: 82, id: 4711, deletedDate: null);
+
+        $this->assertSame(82, $deleted->deletionId);
+        $this->assertSame(4711, $deleted->id);
     }
 }

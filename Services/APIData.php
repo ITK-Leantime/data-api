@@ -141,13 +141,17 @@ class APIData
         }, $values);
     }
 
-    public function getDeleted(string $type, ?int $deletedAfter = null): array
+    public function getDeleted(string $type, int $startId, int $limit, ?int $deletedAfter = null): array
     {
-        $values = $this->apiDataRepository->getDeleted($type, $deletedAfter);
+        $values = $this->apiDataRepository->getDeleted($type, $startId, $limit, $deletedAfter);
 
+        // Named arguments: the row's `id` is the deletion's own id and `entryId`
+        // the deleted entity's, and both are ints, so a swap would map cleanly
+        // onto the wrong field instead of raising a TypeError.
         return array_map(fn ($entry) => new DeletedData(
-            $entry->entryId,
-            $this->getCarbonFromDatabaseValue($entry->dateDeleted),
+            deletionId: $entry->id,
+            id: $entry->entryId,
+            deletedDate: $this->getCarbonFromDatabaseValue($entry->dateDeleted),
         ), $values);
     }
 

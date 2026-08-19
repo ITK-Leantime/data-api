@@ -11,59 +11,41 @@ use PHPUnit\Framework\TestCase;
 final class DeletedRequestParametersTest extends TestCase
 {
     /**
-     * The endpoint has no limit, so every type returns its whole deletion
-     * history. Omitting types used to be an undefined key followed by a foreach
-     * over null; it must not become a bare request that scans every table.
+     * Each type is a table of its own, so there is nothing sensible to default to.
+     * Omitting it used to be an undefined key followed by a foreach over null.
      */
-    public function testOmittingTypesIsRejectedRatherThanScanningEveryTable(): void
+    public function testOmittingTheTypeIsRejected(): void
     {
         $this->expectException(BadRequestException::class);
-        $this->expectExceptionMessage('types is required and must contain at least one of: projects, milestones, tickets, timesheets.');
+        $this->expectExceptionMessage('type is required and must be one of: projects, milestones, tickets, timesheets.');
 
         DeletedRequestParameters::fromInput([]);
     }
 
-    /**
-     * An empty list would answer 200 with nothing, which a sync client reads as
-     * "nothing was deleted" and acts on.
-     */
-    public function testAnEmptyTypesListIsRejected(): void
+    public function testAnEmptyTypeIsRejected(): void
     {
         $this->expectException(BadRequestException::class);
 
-        DeletedRequestParameters::fromInput(['types' => []]);
-    }
-
-    public function testAnEmptyTypesStringIsRejected(): void
-    {
-        $this->expectException(BadRequestException::class);
-
-        DeletedRequestParameters::fromInput(['types' => '']);
-    }
-
-    public function testACommaSeparatedListIsAcceptedForTypes(): void
-    {
-        $parameters = DeletedRequestParameters::fromInput(['types' => 'tickets, timesheets']);
-
-        $this->assertSame(['tickets', 'timesheets'], $parameters->types);
+        DeletedRequestParameters::fromInput(['type' => '']);
     }
 
     /**
-     * The comma separated form is trimmed, and types are matched strictly, so an
-     * untrimmed `?types[]=tickets%20` used to be a 400.
+     * The endpoint took a `types` list before it was paginated. A caller still
+     * sending one must be told, not quietly served whichever type came first.
      */
-    public function testWhitespaceAroundArrayElementsIsIgnored(): void
+    public function testAListOfTypesIsRejected(): void
     {
-        $parameters = DeletedRequestParameters::fromInput(['types' => [' tickets ', 'timesheets']]);
+        $this->expectException(BadRequestException::class);
+        $this->expectExceptionMessage('type must be a single value.');
 
-        $this->assertSame(['tickets', 'timesheets'], $parameters->types);
+        DeletedRequestParameters::fromInput(['type' => ['tickets', 'timesheets']]);
     }
 
-    public function testDuplicateTypesAreCollapsed(): void
+    public function testWhitespaceAroundTheTypeIsIgnored(): void
     {
-        $parameters = DeletedRequestParameters::fromInput(['types' => ['tickets', 'tickets']]);
+        $parameters = DeletedRequestParameters::fromInput(['type' => ' tickets ']);
 
-        $this->assertSame(['tickets'], $parameters->types);
+        $this->assertSame('tickets', $parameters->type);
     }
 
     /**
@@ -73,9 +55,9 @@ final class DeletedRequestParametersTest extends TestCase
     public function testAnUnknownTypeIsRejectedWithoutEchoingTheInput(): void
     {
         $this->expectException(BadRequestException::class);
-        $this->expectExceptionMessage('types must only contain: projects, milestones, tickets, timesheets.');
+        $this->expectExceptionMessage('type must be one of: projects, milestones, tickets, timesheets.');
 
-        DeletedRequestParameters::fromInput(['types' => '<script>']);
+        DeletedRequestParameters::fromInput(['type' => '<script>']);
     }
 
     /**
@@ -86,12 +68,76 @@ final class DeletedRequestParametersTest extends TestCase
     {
         $this->expectException(BadRequestException::class);
 
-        DeletedRequestParameters::fromInput(['types' => 'users']);
+        DeletedRequestParameters::fromInput(['type' => 'users']);
+    }
+
+    public function testAValidRequestFallsBackToTheDocumentedPagingDefaults(): void
+    {
+        $parameters = DeletedRequestParameters::fromInput(['type' => 'timesheets']);
+
+        $this->assertSame('timesheets', $parameters->type);
+        $this->assertSame(0, $parameters->start);
+        $this->assertSame(DeletedRequestParameters::DEFAULT_LIMIT, $parameters->limit);
+        $this->assertNull($parameters->deleted);
+    }
+
+    /**
+     * The endpoint is documented as GET with query parameters, so every value can
+     * arrive as a string.
+     */
+    public function testNumericStringsFromAQueryStringBecomeIntegers(): void
+    {
+        $parameters = DeletedRequestParameters::fromInput([
+            'type' => 'tickets',
+            'start' => '25',
+            'limit' => '50',
+        ]);
+
+        $this->assertSame(25, $parameters->start);
+        $this->assertSame(50, $parameters->limit);
+    }
+
+    /**
+     * Laravel ignores a negative limit, which drops the LIMIT clause and returns
+     * the entire deletion history — the very thing pagination exists to prevent.
+     */
+    public function testANegativeLimitIsRejectedRatherThanReturningEveryRow(): void
+    {
+        $this->expectException(BadRequestException::class);
+
+        DeletedRequestParameters::fromInput(['type' => 'tickets', 'limit' => '-1']);
+    }
+
+    public function testAZeroLimitIsRejected(): void
+    {
+        $this->expectException(BadRequestException::class);
+        $this->expectExceptionMessage('limit must be at least 1.');
+
+        DeletedRequestParameters::fromInput(['type' => 'tickets', 'limit' => 0]);
+    }
+
+    /**
+     * The effective limit is echoed back in the response parameters, so a capped
+     * request is visible to the caller rather than silently different.
+     */
+    public function testALimitAboveTheMaximumIsCapped(): void
+    {
+        $parameters = DeletedRequestParameters::fromInput(['type' => 'tickets', 'limit' => 5000]);
+
+        $this->assertSame(DeletedRequestParameters::MAX_LIMIT, $parameters->limit);
+        $this->assertSame(DeletedRequestParameters::MAX_LIMIT, $parameters->toArray()['limit']);
+    }
+
+    public function testANegativeStartIsRejected(): void
+    {
+        $this->expectException(BadRequestException::class);
+
+        DeletedRequestParameters::fromInput(['type' => 'tickets', 'start' => -5]);
     }
 
     public function testTheDeletedTimestampIsNarrowedToAnInteger(): void
     {
-        $parameters = DeletedRequestParameters::fromInput(['types' => 'tickets', 'deleted' => '1759906882']);
+        $parameters = DeletedRequestParameters::fromInput(['type' => 'tickets', 'deleted' => '1759906882']);
 
         $this->assertSame(1759906882, $parameters->deleted);
     }
@@ -101,13 +147,34 @@ final class DeletedRequestParametersTest extends TestCase
         $this->expectException(BadRequestException::class);
         $this->expectExceptionMessage('deleted must be a whole number.');
 
-        DeletedRequestParameters::fromInput(['types' => 'tickets', 'deleted' => 'last week']);
+        DeletedRequestParameters::fromInput(['type' => 'tickets', 'deleted' => 'last week']);
     }
 
     public function testAnEmptyDeletedTimestampIsTreatedAsAbsent(): void
     {
-        $parameters = DeletedRequestParameters::fromInput(['types' => 'tickets', 'deleted' => '']);
+        $parameters = DeletedRequestParameters::fromInput(['type' => 'tickets', 'deleted' => '']);
 
         $this->assertNull($parameters->deleted);
+    }
+
+    /**
+     * The parameters are echoed back so a client can see the page it got, and so
+     * `start` for the next request is obvious from the response it holds.
+     */
+    public function testTheEffectiveParametersAreEchoedBack(): void
+    {
+        $parameters = DeletedRequestParameters::fromInput([
+            'type' => 'projects',
+            'start' => 82,
+            'limit' => 10,
+            'deleted' => 1759906882,
+        ]);
+
+        $this->assertSame([
+            'type' => 'projects',
+            'start' => 82,
+            'limit' => 10,
+            'deleted' => 1759906882,
+        ], $parameters->toArray());
     }
 }

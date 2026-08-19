@@ -69,18 +69,17 @@ class API extends Controller
     {
         $parameters = DeletedRequestParameters::fromInput($input);
 
-        $deletedEntries = [];
-        $count = 0;
-
-        foreach ($parameters->types as $type) {
-            $deletedEntries[$type] = $this->dataAPIService->getDeleted($type, $parameters->deleted);
-            $count = $count + count($deletedEntries[$type]);
-        }
+        $results = $this->dataAPIService->getDeleted(
+            $parameters->type,
+            $parameters->start,
+            $parameters->limit,
+            $parameters->deleted,
+        );
 
         return (new ResponseData(
             $parameters->toArray(),
-            $count,
-            $deletedEntries,
+            count($results),
+            $results,
         ))->toArray();
     }
 
