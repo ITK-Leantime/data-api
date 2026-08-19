@@ -81,7 +81,7 @@ Attach query/body parameters to the request:
 * start: Starting deletionId of the results.
 * limit: Maximum number of results to get from start deletionId in ascending order. Must be at
   least 1, and is capped at 1000. The limit that was actually applied is echoed in `parameters`.
-* deleted: Unix timestamp. Only retrieve ids of entities deleted after this timestamp.
+* deletedAfter: Unix timestamp. Only retrieve ids of entities deleted after this timestamp.
 
 Each result carries a `deletionId` alongside the deleted entity's `id`. Deletions are appended
 in the order they happen, so `deletionId` — not `id` — is what the results are ordered and paged
@@ -94,7 +94,7 @@ Example request:
 curl https://leantime.local.itkdev.dk/apidata/api/deleted
    -H "x-api-key: lt_1234567890"
    -H "Content-Type: application/json"
-   -d '{"type":"tickets","start":0,"limit":100,"deleted":1759906882}'
+   -d '{"type":"tickets","start":0,"limit":100,"deletedAfter":1759906882}'
 ```
 
 ## Errors

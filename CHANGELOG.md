@@ -6,6 +6,7 @@
   * Paginated the deleted endpoint with `start` and `limit`, so a response is bounded like the entity endpoints instead of carrying the whole deletion history.
   * Added `deletionId` to the deleted results — the deletion's own id, which the results are ordered and paged on, as opposed to `id`, which is the deleted entity's.
   * Replaced `types` with a required singular `type` on the deleted endpoint, since a request now answers with one type's page; `results` is a flat list rather than an object keyed by type.
+  * Renamed the deleted endpoint's `deleted` parameter to `deletedAfter`, matching `modifiedAfter` on the entity endpoints. The old name answers 400 rather than being ignored, which would have returned the whole deletion history to a caller that believes it asked for a window.
 * [PR-20](https://github.com/ITK-Leantime/data-api/pull/20)
   * Added a plugin owned `itk_data_api_modified` column, maintained by database triggers, on projects, tickets, timesheets and users, so no write path can leave the sync watermark behind.
   * Changed `modifiedAfter` to filter on that column, so edits to existing tickets and milestones are no longer missed and time logged from the weekly grid is picked up.

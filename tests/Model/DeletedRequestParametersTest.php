@@ -78,7 +78,7 @@ final class DeletedRequestParametersTest extends TestCase
         $this->assertSame('timesheets', $parameters->type);
         $this->assertSame(0, $parameters->start);
         $this->assertSame(DeletedRequestParameters::DEFAULT_LIMIT, $parameters->limit);
-        $this->assertNull($parameters->deleted);
+        $this->assertNull($parameters->deletedAfter);
     }
 
     /**
@@ -135,26 +135,50 @@ final class DeletedRequestParametersTest extends TestCase
         DeletedRequestParameters::fromInput(['type' => 'tickets', 'start' => -5]);
     }
 
-    public function testTheDeletedTimestampIsNarrowedToAnInteger(): void
+    public function testTheDeletedAfterTimestampIsNarrowedToAnInteger(): void
     {
-        $parameters = DeletedRequestParameters::fromInput(['type' => 'tickets', 'deleted' => '1759906882']);
+        $parameters = DeletedRequestParameters::fromInput(['type' => 'tickets', 'deletedAfter' => '1759906882']);
 
-        $this->assertSame(1759906882, $parameters->deleted);
+        $this->assertSame(1759906882, $parameters->deletedAfter);
     }
 
-    public function testANonNumericDeletedTimestampIsRejected(): void
+    public function testANonNumericDeletedAfterTimestampIsRejected(): void
     {
         $this->expectException(BadRequestException::class);
-        $this->expectExceptionMessage('deleted must be a whole number.');
+        $this->expectExceptionMessage('deletedAfter must be a whole number.');
 
-        DeletedRequestParameters::fromInput(['type' => 'tickets', 'deleted' => 'last week']);
+        DeletedRequestParameters::fromInput(['type' => 'tickets', 'deletedAfter' => 'last week']);
     }
 
-    public function testAnEmptyDeletedTimestampIsTreatedAsAbsent(): void
+    public function testAnEmptyDeletedAfterTimestampIsTreatedAsAbsent(): void
+    {
+        $parameters = DeletedRequestParameters::fromInput(['type' => 'tickets', 'deletedAfter' => '']);
+
+        $this->assertNull($parameters->deletedAfter);
+    }
+
+    /**
+     * Ignoring the retired name would answer with the whole deletion history while
+     * the caller believes it asked for a window — which is how the consumer's
+     * timestamp went missing when it sent `deletedAfter` to the old `deleted`.
+     */
+    public function testTheOldDeletedNameIsRejectedRatherThanIgnored(): void
+    {
+        $this->expectException(BadRequestException::class);
+        $this->expectExceptionMessage('deleted has been renamed to deletedAfter.');
+
+        DeletedRequestParameters::fromInput(['type' => 'tickets', 'deleted' => '1759906882']);
+    }
+
+    /**
+     * An empty value means the parameter was never really sent, so an old client's
+     * bare `?deleted=` is not worth failing the request over.
+     */
+    public function testAnEmptyOldDeletedValueIsTreatedAsAbsent(): void
     {
         $parameters = DeletedRequestParameters::fromInput(['type' => 'tickets', 'deleted' => '']);
 
-        $this->assertNull($parameters->deleted);
+        $this->assertNull($parameters->deletedAfter);
     }
 
     /**
@@ -167,14 +191,14 @@ final class DeletedRequestParametersTest extends TestCase
             'type' => 'projects',
             'start' => 82,
             'limit' => 10,
-            'deleted' => 1759906882,
+            'deletedAfter' => 1759906882,
         ]);
 
         $this->assertSame([
             'type' => 'projects',
             'start' => 82,
             'limit' => 10,
-            'deleted' => 1759906882,
+            'deletedAfter' => 1759906882,
         ], $parameters->toArray());
     }
 }

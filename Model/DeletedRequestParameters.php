@@ -23,7 +23,7 @@ readonly class DeletedRequestParameters
         public string $type,
         public int $start,
         public int $limit,
-        public ?int $deleted,
+        public ?int $deletedAfter,
     ) {}
 
     /**
@@ -31,11 +31,13 @@ readonly class DeletedRequestParameters
      */
     public static function fromInput(array $input): self
     {
+        self::rejectTheOldDeletedName($input);
+
         return new self(
             type: self::toType($input['type'] ?? null),
             start: self::toNonNegativeInt($input['start'] ?? 0, 'start'),
             limit: self::toLimit($input['limit'] ?? self::DEFAULT_LIMIT),
-            deleted: self::toTimestamp($input['deleted'] ?? null, 'deleted'),
+            deletedAfter: self::toTimestamp($input['deletedAfter'] ?? null, 'deletedAfter'),
         );
     }
 
@@ -50,7 +52,7 @@ readonly class DeletedRequestParameters
             'type' => $this->type,
             'start' => $this->start,
             'limit' => $this->limit,
-            'deleted' => $this->deleted,
+            'deletedAfter' => $this->deletedAfter,
         ];
     }
 
@@ -65,6 +67,23 @@ readonly class DeletedRequestParameters
             APIData::TYPE_TICKETS,
             APIData::TYPE_TIMESHEETS,
         ];
+    }
+
+    /**
+     * `deleted` was this parameter's name until it was aligned with the entity
+     * endpoints' `modifiedAfter`. Ignoring it would answer with the whole deletion
+     * history while the caller believes it asked for a window — which is exactly
+     * how the consumer's timestamp went missing when it sent the other name.
+     *
+     * @param array<string, mixed> $input
+     */
+    private static function rejectTheOldDeletedName(array $input): void
+    {
+        $value = $input['deleted'] ?? null;
+
+        if ($value !== null && $value !== '') {
+            throw new BadRequestException('deleted has been renamed to deletedAfter.');
+        }
     }
 
     private static function toType(mixed $value): string

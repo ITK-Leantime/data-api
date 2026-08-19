@@ -73,7 +73,7 @@ class API extends Controller
             $parameters->type,
             $parameters->start,
             $parameters->limit,
-            $parameters->deleted,
+            $parameters->deletedAfter,
         );
 
         return (new ResponseData(
