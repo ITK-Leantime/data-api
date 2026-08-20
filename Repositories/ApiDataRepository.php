@@ -97,7 +97,12 @@ class ApiDataRepository
             ->toArray();
     }
 
-    public function getDeleted(string $type, ?int $deletedAfter = null): array
+    /**
+     * Paged on the tracking table's own row id rather than on `entryId`: rows are
+     * appended as entities are deleted, so `id` is the only column that both
+     * orders them and stays put while a client pages through.
+     */
+    public function getDeleted(string $type, int $startId, int $limit, ?int $deletedAfter = null): array
     {
         $tableName = match ($type) {
             APIData::TYPE_PROJECTS => 'itk_projects_deleted',
@@ -108,10 +113,13 @@ class ApiDataRepository
 
         return $this->query()
             ->from($tableName, "entry")
-            ->select(["entryId", "dateDeleted"])
+            ->select(["entry.id", "entry.entryId", "entry.dateDeleted"])
+            ->where("entry.id", ">=", $startId)
             ->when($type === APIData::TYPE_MILESTONES, fn ($query) => $query->where('type', '=', 'milestone'))
             ->when($type === APIData::TYPE_TICKETS, fn ($query) => $query->where('type', '<>', 'milestone'))
             ->when($deletedAfter !== null, fn ($query) => $query->where("entry.dateDeleted", ">=", $this->cutoff($deletedAfter)))
+            ->orderBy("entry.id", "ASC")
+            ->limit($limit)
             ->get()
             ->toArray();
     }

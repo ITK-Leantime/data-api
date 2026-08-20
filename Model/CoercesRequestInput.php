@@ -10,6 +10,24 @@ namespace Leantime\Plugins\APIData\Model;
  */
 trait CoercesRequestInput
 {
+    public const DEFAULT_LIMIT = 100;
+    public const MAX_LIMIT = 1000;
+
+    /**
+     * A limit below 1 is rejected rather than clamped; above the maximum it is
+     * capped silently, and `toArray()` echoes what was actually applied.
+     */
+    private static function toLimit(mixed $value): int
+    {
+        $limit = self::toNonNegativeInt($value, 'limit');
+
+        if ($limit < 1) {
+            throw new BadRequestException('limit must be at least 1.');
+        }
+
+        return min($limit, self::MAX_LIMIT);
+    }
+
     private static function toNonNegativeInt(mixed $value, string $name): int
     {
         if (!is_int($value) && !(is_string($value) && is_numeric($value))) {

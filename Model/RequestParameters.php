@@ -12,9 +12,6 @@ readonly class RequestParameters
 {
     use CoercesRequestInput;
 
-    public const DEFAULT_LIMIT = 100;
-    public const MAX_LIMIT = 1000;
-
     /**
      * @param list<int>|null $ids
      * @param list<int>|null $projectIds
@@ -55,17 +52,6 @@ readonly class RequestParameters
             'ids' => $this->ids,
             'projectIds' => $this->projectIds,
         ];
-    }
-
-    private static function toLimit(mixed $value): int
-    {
-        $limit = self::toNonNegativeInt($value, 'limit');
-
-        if ($limit < 1) {
-            throw new BadRequestException('limit must be at least 1.');
-        }
-
-        return min($limit, self::MAX_LIMIT);
     }
 
     /**

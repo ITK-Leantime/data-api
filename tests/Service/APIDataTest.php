@@ -178,11 +178,17 @@ final class APIDataTest extends TestCase
         $this->assertNull($worker->modified);
     }
 
-    public function testGetDeletedMapsEntryIdAndDeletedDate(): void
+    /**
+     * The two ids are both plain ints, so nothing but this assertion catches them
+     * being swapped — and a caller paging on `deletionId` would then walk entity
+     * ids and silently skip deletions.
+     */
+    public function testGetDeletedKeepsTheDeletionIdApartFromTheDeletedEntityId(): void
     {
         $deleted = $this->makeServiceReturningDeleted([$this->deletedRow()])
-            ->getDeleted(APIData::TYPE_TICKETS)[0];
+            ->getDeleted(APIData::TYPE_TICKETS, 0, 100)[0];
 
+        $this->assertSame(82, $deleted->deletionId);
         $this->assertSame(4711, $deleted->id);
         $this->assertInstanceOf(CarbonInterface::class, $deleted->deletedDate);
         $this->assertSame('2026-03-04 08:15:00', $deleted->deletedDate->format('Y-m-d H:i:s'));
@@ -197,7 +203,7 @@ final class APIDataTest extends TestCase
     {
         $deleted = $this->makeServiceReturningDeleted([
             $this->deletedRow(['entryId' => null, 'dateDeleted' => '0000-00-00 00:00:00']),
-        ])->getDeleted(APIData::TYPE_TICKETS)[0];
+        ])->getDeleted(APIData::TYPE_TICKETS, 0, 100)[0];
 
         $this->assertNull($deleted->id);
         $this->assertNull($deleted->deletedDate);
@@ -315,6 +321,7 @@ final class APIDataTest extends TestCase
     private function deletedRow(array $overrides = []): object
     {
         return (object) array_merge([
+            'id' => 82,
             'entryId' => 4711,
             'dateDeleted' => '2026-03-04 08:15:00',
         ], $overrides);

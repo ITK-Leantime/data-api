@@ -5,22 +5,25 @@ namespace Leantime\Plugins\APIData\Model;
 use Leantime\Plugins\APIData\Services\APIData;
 
 /**
- * The parameters for the deleted-entities endpoint. `types` is required: the
- * endpoint has no limit, so each type returns its whole deletion history, and
- * defaulting it would let a bare request scan every table. An unknown value used
- * to reach the repository's match arm, which reflected the raw input into the
- * error page.
+ * The parameters for the deleted-entities endpoint. `type` is required and names
+ * exactly one type: the endpoint serves a single deletion table per request, and
+ * pages through it with `start`/`limit` like the entity endpoints. An unknown
+ * value used to reach the repository's match arm, which reflected the raw input
+ * into the error page.
+ *
+ * `start` is a watermark on `deletionId`, the deleted table's own row id, not on
+ * the deleted entity's id — deletions are appended, so that is the one column
+ * that orders them and never changes under a paging client.
  */
 readonly class DeletedRequestParameters
 {
     use CoercesRequestInput;
 
-    /**
-     * @param list<string> $types
-     */
     public function __construct(
-        public array $types,
-        public ?int $deleted,
+        public string $type,
+        public int $start,
+        public int $limit,
+        public ?int $deletedAfter,
     ) {}
 
     /**
@@ -28,20 +31,29 @@ readonly class DeletedRequestParameters
      */
     public static function fromInput(array $input): self
     {
+        self::rejectTheOldTypesName($input);
+        self::rejectTheOldDeletedName($input);
+
         return new self(
-            types: self::toTypes($input['types'] ?? null),
-            deleted: self::toTimestamp($input['deleted'] ?? null, 'deleted'),
+            type: self::toType($input['type'] ?? null),
+            start: self::toNonNegativeInt($input['start'] ?? 0, 'start'),
+            limit: self::toLimit($input['limit'] ?? self::DEFAULT_LIMIT),
+            deletedAfter: self::toTimestamp($input['deletedAfter'] ?? null, 'deletedAfter'),
         );
     }
 
     /**
+     * The effective parameters, so a caller can see the limit it actually got.
+     *
      * @return array<string, mixed>
      */
     public function toArray(): array
     {
         return [
-            'types' => $this->types,
-            'deleted' => $this->deleted,
+            'type' => $this->type,
+            'start' => $this->start,
+            'limit' => $this->limit,
+            'deletedAfter' => $this->deletedAfter,
         ];
     }
 
@@ -59,30 +71,77 @@ readonly class DeletedRequestParameters
     }
 
     /**
-     * @return list<string>
+     * `types` took a list until the endpoint was narrowed to serving one type per
+     * request. A caller still sending it has no `type` at all, so without this it
+     * would be turned away by the generic "type is required" — true, but silent
+     * about the one thing it needs to change.
+     *
+     * @param array<string, mixed> $input
      */
-    private static function toTypes(mixed $value): array
+    private static function rejectTheOldTypesName(array $input): void
     {
-        $types = self::toList($value, 'types');
+        if (self::wasSent($input['types'] ?? null)) {
+            throw new BadRequestException('types has been replaced by type, which names exactly one type.');
+        }
+    }
 
-        // An empty list is rejected along with a missing one: it would otherwise
-        // answer 200 with nothing, which a caller reads as "nothing was deleted".
-        if ($types === null || $types === []) {
+    /**
+     * `deleted` was this parameter's name until it was aligned with the entity
+     * endpoints' `modifiedAfter`. Ignoring it would answer with the whole deletion
+     * history while the caller believes it asked for a window — which is exactly
+     * how the consumer's timestamp went missing when it sent the other name.
+     *
+     * @param array<string, mixed> $input
+     */
+    private static function rejectTheOldDeletedName(array $input): void
+    {
+        if (self::wasSent($input['deleted'] ?? null)) {
+            throw new BadRequestException('deleted has been renamed to deletedAfter.');
+        }
+    }
+
+    /**
+     * A retired parameter is only worth failing over when it carries something.
+     * An empty value means it was never really sent — a bare `?deleted=` or
+     * `?types[]=` is what a query string leaves behind, not a request for the old
+     * behaviour.
+     */
+    private static function wasSent(mixed $value): bool
+    {
+        if (is_array($value)) {
+            return [] !== array_filter($value, fn ($element) => $element !== null && $element !== '');
+        }
+
+        return $value !== null && $value !== '';
+    }
+
+    private static function toType(mixed $value): string
+    {
+        // `type[]=tickets&type[]=timesheets` is rejected rather than reduced to
+        // its first element, which would answer with a page of a type the caller
+        // did not ask about. The retired `types` name is caught earlier.
+        if (is_array($value)) {
+            throw new BadRequestException('type must be a single value.');
+        }
+
+        $type = is_string($value) ? trim($value) : $value;
+
+        if ($type === null || $type === '') {
             throw new BadRequestException(sprintf(
-                'types is required and must contain at least one of: %s.',
+                'type is required and must be one of: %s.',
                 implode(', ', self::supportedTypes()),
             ));
         }
 
-        foreach ($types as $type) {
-            if (!in_array($type, self::supportedTypes(), true)) {
-                throw new BadRequestException(sprintf(
-                    'types must only contain: %s.',
-                    implode(', ', self::supportedTypes()),
-                ));
-            }
+        // Compared strictly, and the input is never echoed back — an unknown type
+        // reached the error page verbatim before.
+        if (!in_array($type, self::supportedTypes(), true)) {
+            throw new BadRequestException(sprintf(
+                'type must be one of: %s.',
+                implode(', ', self::supportedTypes()),
+            ));
         }
 
-        return array_values(array_unique($types));
+        return $type;
     }
 }
