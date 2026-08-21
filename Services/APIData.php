@@ -12,6 +12,7 @@ use Leantime\Plugins\APIData\Model\TicketData;
 use Leantime\Plugins\APIData\Model\TimesheetData;
 use Leantime\Plugins\APIData\Model\WorkerData;
 use Leantime\Plugins\APIData\Repositories\ApiDataRepository;
+use Leantime\Plugins\APIData\Repositories\SchemaRepository;
 
 class APIData
 {
@@ -25,91 +26,21 @@ class APIData
     public function __construct(
         private readonly TicketRepository $ticketRepository,
         private readonly ApiDataRepository $apiDataRepository,
+        private readonly SchemaRepository $schemaRepository,
     ) {}
 
+    /**
+     * Leantime calls this on every install, and offers no separate upgrade hook,
+     * so SchemaRepository::install() has to be idempotent.
+     */
     public function install(): void
     {
-        $sql = "
-        CREATE TABLE IF NOT EXISTS `itk_projects_deleted` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `entryId` int(11) DEFAULT NULL,
-            `dateDeleted` datetime DEFAULT NOW(),
-            PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TABLE IF NOT EXISTS `itk_tickets_deleted` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `entryId` int(11) DEFAULT NULL,
-            `type` varchar(255) DEFAULT NULL,
-            `dateDeleted` datetime DEFAULT NOW(),
-            PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TABLE IF NOT EXISTS `itk_timesheets_deleted` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `entryId` int(11) DEFAULT NULL,
-            `dateDeleted` datetime DEFAULT NOW(),
-            PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TRIGGER itk_projects_deleted_trigger
-        AFTER DELETE ON zp_projects
-        FOR EACH ROW
-        BEGIN
-           INSERT INTO itk_projects_deleted(entryId)
-           VALUES (OLD.id);
-        END;
-
-        CREATE TRIGGER itk_tickets_deleted_trigger
-        AFTER DELETE ON zp_tickets
-        FOR EACH ROW
-        BEGIN
-           INSERT INTO itk_tickets_deleted(entryId, type)
-           VALUES (OLD.id, OLD.type);
-        END;
-
-        CREATE TRIGGER itk_timesheets_deleted_trigger
-        AFTER DELETE ON zp_timesheets
-        FOR EACH ROW
-        BEGIN
-           INSERT INTO itk_timesheets_deleted(entryId)
-           VALUES (OLD.id);
-        END;
-        ";
-
-        // Use PDO for multi-statement SQL with parameter binding
-        // We need to use PDO directly because Laravel's statement() method
-        // may not handle multi-statement SQL properly
-        $pdo = app('db')->connection()->getPdo();
-        $stmn = $pdo->prepare($sql);
-
-        $stmn->execute();
-
-        $stmn->closeCursor();
+        $this->schemaRepository->install();
     }
 
     public function uninstall(): void
     {
-        $sql = "
-        DROP TRIGGER itk_projects_deleted_trigger;
-        DROP TRIGGER itk_tickets_deleted_trigger;
-        DROP TRIGGER itk_timesheets_deleted_trigger;
-        ";
-
-        // Tables are not remove, to preserve data through install/uninstalls.
-        // DROP TABLE `itk_projects_deleted`;
-        // DROP TABLE `itk_tickets_deleted`;
-        // DROP TABLE `itk_timesheets_deleted`;
-
-        // Use PDO for multi-statement SQL with parameter binding
-        // We need to use PDO directly because Laravel's statement() method
-        // may not handle multi-statement SQL properly
-        $pdo = app('db')->connection()->getPdo();
-        $stmn = $pdo->prepare($sql);
-
-        $stmn->execute();
-
-        $stmn->closeCursor();
+        $this->schemaRepository->uninstall();
     }
 
     public function getProjects(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
@@ -125,7 +56,7 @@ class APIData
         }, $values);
     }
 
-    public function getMilestones(int $startId, int $limit, int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
+    public function getMilestones(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getMilestones($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
@@ -139,12 +70,22 @@ class APIData
         }, $values);
     }
 
-    public function getTickets(int $startId, int $limit, int $modifiedAfter = null, array $ids = null, ?array $projectIds = null): array
+    public function getTickets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getTickets($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
-        return array_map(function ($value) {
-            $projectStatuses = $this->ticketRepository->getStateLabels($value->projectId);
+        // Tickets arrive in batches from the same handful of projects, so the
+        // labels are looked up once per project instead of once per ticket. Kept
+        // local to the call, since labels can change between requests.
+        $statusesByProject = [];
+
+        return array_map(function ($value) use (&$statusesByProject) {
+            // Asked for labels without a project id, Leantime falls back to
+            // session('currentProject'), which would resolve the status against
+            // an unrelated project.
+            $projectStatuses = $value->projectId !== null
+                ? $statusesByProject[$value->projectId] ??= $this->ticketRepository->getStateLabels($value->projectId)
+                : [];
 
             return new TicketData(
                 $value->id,
@@ -168,40 +109,49 @@ class APIData
         $values = $this->apiDataRepository->getTimesheets($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
         return array_map(function ($value) {
+            // Named arguments: CarbonImmutable has a __toString(), so a
+            // mis-ordered date would be coerced into one of the string
+            // parameters instead of raising a TypeError.
             return new TimesheetData(
-                $value->id,
-                $value->ticketId,
-                $value->projectId,
-                $value->description,
-                $value->hours,
-                $value->username,
-                $this->getCarbonFromDatabaseValue($value->workDate),
-                $this->getCarbonFromDatabaseValue($value->modified),
-                $value->kind,
+                id: $value->id,
+                ticketId: $value->ticketId,
+                projectId: $value->projectId,
+                description: $value->description,
+                hours: $value->hours,
+                userId: $value->userId,
+                username: $value->username,
+                kind: $value->kind,
+                workDate: $this->getCarbonFromDatabaseValue($value->workDate),
+                modified: $this->getCarbonFromDatabaseValue($value->modified),
             );
         }, $values);
     }
 
-    public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
+    public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
-        $values = $this->apiDataRepository->getWorkers($startId, $limit, $modifiedAfter, $ids, $projectIds);
+        $values = $this->apiDataRepository->getWorkers($startId, $limit, $modifiedAfter, $ids);
 
         return array_map(function ($value) {
             return new WorkerData(
-                $value->id,
-                $value->username,
-                $value->name,
+                id: $value->id,
+                email: $value->username,
+                name: $value->name,
+                modified: $this->getCarbonFromDatabaseValue($value->modified),
             );
         }, $values);
     }
 
-    public function getDeleted(string $type, ?int $deletedAfter = null): array
+    public function getDeleted(string $type, int $startId, int $limit, ?int $deletedAfter = null): array
     {
-        $values = $this->apiDataRepository->getDeleted($type, $deletedAfter);
+        $values = $this->apiDataRepository->getDeleted($type, $startId, $limit, $deletedAfter);
 
+        // Named arguments: the row's `id` is the deletion's own id and `entryId`
+        // the deleted entity's, and both are ints, so a swap would map cleanly
+        // onto the wrong field instead of raising a TypeError.
         return array_map(fn ($entry) => new DeletedData(
-            $entry->entryId,
-            $this->getCarbonFromDatabaseValue($entry->dateDeleted),
+            deletionId: $entry->id,
+            id: $entry->entryId,
+            deletedDate: $this->getCarbonFromDatabaseValue($entry->dateDeleted),
         ), $values);
     }
 

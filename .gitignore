@@ -1,7 +1,6 @@
 vendor
 .DS_Store
 *.cache
-composer.lock
 
 # Release artifacts
 release/
