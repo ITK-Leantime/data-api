@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-21
+
 * [PR-21](https://github.com/ITK-Leantime/data-api/pull/21)
   * Paginated the deleted endpoint with `start` and `limit`, so a response is bounded like the entity endpoints instead of carrying the whole deletion history.
   * Added `deletionId` to the deleted results — the deletion's own id, which the results are ordered and paged on, as opposed to `id`, which is the deleted entity's.
@@ -59,7 +61,8 @@
 * [PR-2](https://github.com/ITK-Leantime/data-api/pull/2)
  * Initial release
 
-[Unreleased]: https://github.com/ITK-Leantime/data-api/compare/0.1.2...HEAD
+[Unreleased]: https://github.com/ITK-Leantime/data-api/compare/1.0.0...HEAD
+[1.0.0]: https://github.com/ITK-Leantime/data-api/compare/0.1.2...1.0.0
 [0.1.2]: https://github.com/ITK-Leantime/data-api/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/ITK-Leantime/data-api/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/ITK-Leantime/data-api/compare/0.0.2...0.1.0
