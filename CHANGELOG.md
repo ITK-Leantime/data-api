@@ -35,6 +35,13 @@
   * Pinned the development dependencies to the Leantime release the plugin targets.
   * Added PHPUnit test setup and a Taskfile for running it, and ran the tests in the project's Docker Compose stack on pull requests.
 
+## [1.0.1] - 2026-01-08
+
+* [PR-9](https://github.com/ITK-Leantime/data-api/pull/9)
+  * Released the PR-8 change as 1.0.1, jumping the version from 0.1.0 rather than incrementing to 0.1.1.
+* [PR-10](https://github.com/ITK-Leantime/data-api/pull/10)
+  * Retracted that release. The same change went out as 0.1.1, so 1.0.1 carries nothing 0.1.1 does not — the tag is recorded here only so the version sequence is traceable.
+
 ## [0.1.2] - 2026-03-06
 
 * [PR-12](https://github.com/ITK-Leantime/data-api/pull/12)
@@ -61,8 +68,9 @@
 * [PR-2](https://github.com/ITK-Leantime/data-api/pull/2)
  * Initial release
 
-[Unreleased]: https://github.com/ITK-Leantime/data-api/compare/1.0.0...HEAD
-[1.0.0]: https://github.com/ITK-Leantime/data-api/compare/0.1.2...1.0.0
+[Unreleased]: https://github.com/ITK-Leantime/data-api/compare/1.1.0...HEAD
+[1.1.0]: https://github.com/ITK-Leantime/data-api/compare/0.1.2...1.1.0
+[1.0.1]: https://github.com/ITK-Leantime/data-api/compare/0.1.0...1.0.1
 [0.1.2]: https://github.com/ITK-Leantime/data-api/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/ITK-Leantime/data-api/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/ITK-Leantime/data-api/compare/0.0.2...0.1.0
