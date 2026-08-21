@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-08-21
+## [1.1.0] - 2026-08-21
 
 * [PR-21](https://github.com/ITK-Leantime/data-api/pull/21)
   * Paginated the deleted endpoint with `start` and `limit`, so a response is bounded like the entity endpoints instead of carrying the whole deletion history.
