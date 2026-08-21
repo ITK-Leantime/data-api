@@ -5,7 +5,6 @@ export plugin_name=APIData
 export plugin_repo_url=https://github.com/ITK-Leantime/data-api/
 
 buildRelease() {
-  composer install --no-dev --classmap-authoritative
   return
 }
 
