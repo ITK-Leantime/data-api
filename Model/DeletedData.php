@@ -11,9 +11,13 @@ use Carbon\CarbonInterface;
  */
 readonly class DeletedData
 {
+    /**
+     * Create the deleted-entity data transfer object.
+     */
     public function __construct(
         public ?int $deletionId,
         public ?int $id,
         public ?CarbonInterface $deletedDate,
-    ) {}
+    ) {
+    }
 }

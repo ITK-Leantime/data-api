@@ -19,12 +19,16 @@ readonly class DeletedRequestParameters
 {
     use CoercesRequestInput;
 
+    /**
+     * Create the validated parameter set for the deleted endpoint.
+     */
     public function __construct(
         public string $type,
         public int $start,
         public int $limit,
         public ?int $deletedAfter,
-    ) {}
+    ) {
+    }
 
     /**
      * @param array<string, mixed> $input
@@ -115,6 +119,9 @@ readonly class DeletedRequestParameters
         return $value !== null && $value !== '';
     }
 
+    /**
+     * Narrow the requested type to one of the supported entity types.
+     */
     private static function toType(mixed $value): string
     {
         // `type[]=tickets&type[]=timesheets` is rejected rather than reduced to

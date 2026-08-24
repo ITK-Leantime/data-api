@@ -2,6 +2,8 @@
 .claude
 .git*
 .idea
+.markdownlint.jsonc
+.markdownlintignore
 .php-cs-fixer.dist.php
 .phpunit.cache
 .twig-cs-fixer.dist.php
@@ -11,6 +13,8 @@ compose.yml
 composer.lock
 vendor
 Dockerfile
+phpcs.xml
+phpstan.dist.neon
 phpunit.xml
 phpunit.xml.dist
 Taskfile.yml

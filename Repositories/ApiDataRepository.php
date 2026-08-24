@@ -7,13 +7,26 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Leantime\Plugins\APIData\Services\APIData;
 
+/**
+ * Data access for the export endpoints and the deletion tracking tables.
+ */
 class ApiDataRepository
 {
+    /**
+     * Start a query on the default connection.
+     */
     private function query(): Builder
     {
         return app('db')->connection()->query();
     }
 
+    /**
+     * Read a page of project rows.
+     *
+     * @param list<int>|null $ids
+     *
+     * @return list<object>
+     */
     public function getProjects(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         return $this->query()
@@ -28,6 +41,14 @@ class ApiDataRepository
             ->toArray();
     }
 
+    /**
+     * Read a page of milestone rows.
+     *
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
+     *
+     * @return list<object>
+     */
     public function getMilestones(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
@@ -44,6 +65,14 @@ class ApiDataRepository
             ->toArray();
     }
 
+    /**
+     * Read a page of ticket rows, milestones excluded.
+     *
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
+     *
+     * @return list<object>
+     */
     public function getTickets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
@@ -61,6 +90,14 @@ class ApiDataRepository
             ->toArray();
     }
 
+    /**
+     * Read a page of timesheet rows.
+     *
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
+     *
+     * @return list<object>
+     */
     public function getTimesheets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
@@ -79,6 +116,13 @@ class ApiDataRepository
             ->toArray();
     }
 
+    /**
+     * Read a page of user rows.
+     *
+     * @param list<int>|null $ids
+     *
+     * @return list<object>
+     */
     public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         return $this->query()
@@ -101,6 +145,8 @@ class ApiDataRepository
      * Paged on the tracking table's own row id rather than on `entryId`: rows are
      * appended as entities are deleted, so `id` is the only column that both
      * orders them and stays put while a client pages through.
+     *
+     * @return list<object>
      */
     public function getDeleted(string $type, int $startId, int $limit, ?int $deletedAfter = null): array
     {
@@ -143,6 +189,9 @@ class ApiDataRepository
         return sprintf('%s as modified', $this->modified($alias));
     }
 
+    /**
+     * Render a unix timestamp as the UTC datetime string the columns hold.
+     */
     private function cutoff(int $timestamp): string
     {
         // Explicit UTC: Carbon 3 defaults to it, but Carbon comes from the host

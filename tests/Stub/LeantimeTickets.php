@@ -31,6 +31,13 @@ namespace Leantime\Domain\Tickets\Repositories;
  */
 class Tickets
 {
+    /**
+     * Signature copied from Leantime, which leaves $projectId untyped.
+     *
+     * @param int|null $projectId
+     *
+     * @return array<int, array<string, mixed>>
+     */
     public function getStateLabels($projectId = null): array
     {
         throw new \LogicException(

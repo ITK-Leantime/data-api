@@ -7,4 +7,6 @@ namespace Leantime\Plugins\APIData\Model;
  * so the message reaches the client — name the parameter and the expected shape,
  * never the value that was sent.
  */
-class BadRequestException extends \InvalidArgumentException {}
+class BadRequestException extends \InvalidArgumentException
+{
+}

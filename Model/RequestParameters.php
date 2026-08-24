@@ -22,7 +22,8 @@ readonly class RequestParameters
         public ?int $modifiedAfter,
         public ?array $ids,
         public ?array $projectIds,
-    ) {}
+    ) {
+    }
 
     /**
      * @param array<string, mixed> $input

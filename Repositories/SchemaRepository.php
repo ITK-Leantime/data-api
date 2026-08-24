@@ -45,6 +45,12 @@ class SchemaRepository
         'itk_timesheets_deleted_trigger' => ['zp_timesheets', 'itk_timesheets_deleted', 'entryId', 'OLD.id'],
     ];
 
+    /**
+     * Add the tracking columns, indexes, tables and triggers.
+     *
+     * Idempotent: Leantime offers no upgrade hook, so this also runs on an
+     * install over an existing schema.
+     */
     public function install(): void
     {
         $this->execute(...self::deletedTableStatements());
@@ -60,6 +66,9 @@ class SchemaRepository
         }
     }
 
+    /**
+     * Drop the triggers, leaving the recorded history in place.
+     */
     public function uninstall(): void
     {
         // Columns, indexes and the itk_*_deleted tables are deliberately kept:
@@ -109,11 +118,17 @@ class SchemaRepository
         return sprintf('itk_data_api_%s_modified_%s', $shortName, $event);
     }
 
+    /**
+     * The ALTER that adds the plugin-owned timestamp column.
+     */
     public static function addColumnStatement(string $table): string
     {
         return sprintf('ALTER TABLE `%s` ADD COLUMN `%s` DATETIME NULL DEFAULT NULL', $table, self::COLUMN);
     }
 
+    /**
+     * The ALTER that indexes the plugin-owned timestamp column.
+     */
     public static function addIndexStatement(string $table): string
     {
         return sprintf('ALTER TABLE `%s` ADD INDEX `%s` (`%s`)', $table, self::INDEX, self::COLUMN);
@@ -291,11 +306,18 @@ class SchemaRepository
         return $statements;
     }
 
+    /**
+     * The DROP that precedes each CREATE TRIGGER, so a rerun replaces it.
+     */
     private static function dropTriggerStatement(string $name): string
     {
         return sprintf('DROP TRIGGER IF EXISTS `%s`', $name);
     }
 
+    /**
+     * Run each statement on its own, so a failure names the statement that
+     * failed instead of being swallowed by a multi-statement exec.
+     */
     private function execute(string ...$statements): void
     {
         $pdo = app('db')->connection()->getPdo();
@@ -311,6 +333,9 @@ class SchemaRepository
         }
     }
 
+    /**
+     * Whether the column is already present, so install() can skip adding it.
+     */
     private function hasColumn(string $table, string $column): bool
     {
         return $this->query()
@@ -321,6 +346,9 @@ class SchemaRepository
             ->exists();
     }
 
+    /**
+     * Whether the index is already present, so install() can skip adding it.
+     */
     private function hasIndex(string $table, string $index): bool
     {
         return $this->query()
@@ -331,6 +359,9 @@ class SchemaRepository
             ->exists();
     }
 
+    /**
+     * Start a query on the default connection.
+     */
     private function query(): Builder
     {
         return app('db')->connection()->query();

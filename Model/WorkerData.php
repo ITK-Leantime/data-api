@@ -4,8 +4,14 @@ namespace Leantime\Plugins\APIData\Model;
 
 use Carbon\CarbonInterface;
 
+/**
+ * A single user, as the workers endpoint exports it.
+ */
 readonly class WorkerData
 {
+    /**
+     * Create the worker data transfer object.
+     */
     public function __construct(
         public int $id,
         public ?string $email,
@@ -13,5 +19,6 @@ readonly class WorkerData
         // of whitespace, so a user with no name at all has none here.
         public ?string $name,
         public ?CarbonInterface $modified,
-    ) {}
+    ) {
+    }
 }

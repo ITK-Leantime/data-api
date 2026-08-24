@@ -28,6 +28,9 @@ trait CoercesRequestInput
         return min($limit, self::MAX_LIMIT);
     }
 
+    /**
+     * Narrow a parameter to a whole number of zero or more.
+     */
     private static function toNonNegativeInt(mixed $value, string $name): int
     {
         if (!is_int($value) && !(is_string($value) && is_numeric($value))) {
@@ -45,6 +48,9 @@ trait CoercesRequestInput
         return (int) $value;
     }
 
+    /**
+     * Narrow a unix timestamp parameter, treating absent and empty as no bound.
+     */
     private static function toTimestamp(mixed $value, string $name): ?int
     {
         if ($value === null || $value === '') {

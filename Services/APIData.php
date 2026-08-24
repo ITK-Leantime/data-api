@@ -3,7 +3,6 @@
 namespace Leantime\Plugins\APIData\Services;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Query\Builder;
 use Leantime\Domain\Tickets\Repositories\Tickets as TicketRepository;
 use Leantime\Plugins\APIData\Model\DeletedData;
 use Leantime\Plugins\APIData\Model\MilestoneData;
@@ -14,6 +13,10 @@ use Leantime\Plugins\APIData\Model\WorkerData;
 use Leantime\Plugins\APIData\Repositories\ApiDataRepository;
 use Leantime\Plugins\APIData\Repositories\SchemaRepository;
 
+/**
+ * Turns the repository's database rows into the data transfer objects the
+ * endpoints answer with, and owns the plugin's install and uninstall hooks.
+ */
 class APIData
 {
     public const TYPE_PROJECTS = 'projects';
@@ -23,11 +26,15 @@ class APIData
     public const TYPE_WORKERS = 'users';
     public const DATE_FORMAT = 'Y-m-d H:i:s';
 
+    /**
+     * Inject the repositories the service reads and writes through.
+     */
     public function __construct(
         private readonly TicketRepository $ticketRepository,
         private readonly ApiDataRepository $apiDataRepository,
         private readonly SchemaRepository $schemaRepository,
-    ) {}
+    ) {
+    }
 
     /**
      * Leantime calls this on every install, and offers no separate upgrade hook,
@@ -38,11 +45,21 @@ class APIData
         $this->schemaRepository->install();
     }
 
+    /**
+     * Drop everything install() added.
+     */
     public function uninstall(): void
     {
         $this->schemaRepository->uninstall();
     }
 
+    /**
+     * Export a page of projects.
+     *
+     * @param list<int>|null $ids
+     *
+     * @return list<ProjectData>
+     */
     public function getProjects(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         $values = $this->apiDataRepository->getProjects($startId, $limit, $modifiedAfter, $ids);
@@ -56,6 +73,14 @@ class APIData
         }, $values);
     }
 
+    /**
+     * Export a page of milestones.
+     *
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
+     *
+     * @return list<MilestoneData>
+     */
     public function getMilestones(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getMilestones($startId, $limit, $modifiedAfter, $ids, $projectIds);
@@ -70,6 +95,14 @@ class APIData
         }, $values);
     }
 
+    /**
+     * Export a page of tickets, milestones excluded.
+     *
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
+     *
+     * @return list<TicketData>
+     */
     public function getTickets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getTickets($startId, $limit, $modifiedAfter, $ids, $projectIds);
@@ -104,6 +137,14 @@ class APIData
         }, $values);
     }
 
+    /**
+     * Export a page of timesheet entries.
+     *
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
+     *
+     * @return list<TimesheetData>
+     */
     public function getTimesheets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getTimesheets($startId, $limit, $modifiedAfter, $ids, $projectIds);
@@ -127,6 +168,13 @@ class APIData
         }, $values);
     }
 
+    /**
+     * Export a page of users.
+     *
+     * @param list<int>|null $ids
+     *
+     * @return list<WorkerData>
+     */
     public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         $values = $this->apiDataRepository->getWorkers($startId, $limit, $modifiedAfter, $ids);
@@ -141,6 +189,11 @@ class APIData
         }, $values);
     }
 
+    /**
+     * Export a page of deletions of one entity type.
+     *
+     * @return list<DeletedData>
+     */
     public function getDeleted(string $type, int $startId, int $limit, ?int $deletedAfter = null): array
     {
         $values = $this->apiDataRepository->getDeleted($type, $startId, $limit, $deletedAfter);
@@ -155,7 +208,10 @@ class APIData
         ), $values);
     }
 
-    private function getCarbonFromDatabaseValue($value): ?CarbonImmutable
+    /**
+     * Read a UTC database datetime, treating null and the zero date as absent.
+     */
+    private function getCarbonFromDatabaseValue(mixed $value): ?CarbonImmutable
     {
         // "0000-00-00 00:00:00" equals null.
         return $value !== null && $value !== "0000-00-00 00:00:00"
@@ -163,9 +219,12 @@ class APIData
             : null;
     }
 
-    private function getMilestoneId(mixed $value)
+    /**
+     * Read a ticket row's milestone id, treating the zero id as absent.
+     */
+    private function getMilestoneId(mixed $value): ?int
     {
         // milestoneid=0 equals null.
-        return $value->milestoneid !== null && $value->milestoneid > 0 ? $value->milestoneid : null;
+        return $value->milestoneid !== null && $value->milestoneid > 0 ? (int) $value->milestoneid : null;
     }
 }

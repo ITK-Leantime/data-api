@@ -1,0 +1,14 @@
+<?php
+
+/**
+ * Leantime core is not a composer dependency of this plugin, so Laravel's
+ * container helper has to be declared for static analysis. It is a stub only —
+ * nothing here is autoloaded or executed.
+ *
+ * @param array<string, mixed> $parameters
+ *
+ * @return mixed
+ */
+function app(?string $abstract = null, array $parameters = [])
+{
+}

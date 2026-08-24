@@ -115,6 +115,23 @@ A parameter that cannot be interpreted answers `400` with the reason, e.g. a non
 {"error": "modifiedAfter must be a whole number."}
 ```
 
+## API Key
+
+To use the plugin you need an API key for leantime.
+
+See <https://docs.leantime.io/api/usage?id=connect>.
+
+The API should be set as a header for all requests to the API.
+
+E.g.
+
+```shell
+curl https://{{YOUR_DOMAIN}}/apidata/api/{{TYPE}}
+   -H "x-api-key: {{YOUR_APIKEY}}"
+   -H "Content-Type: application/json"
+   -d '{"start":0,"limit":100}'
+```
+
 ## Development
 
 The plugin has no long-running stack, so everything runs in a one-off
@@ -140,19 +157,59 @@ and locks `laravel/framework v11.45.1` and `nesbot/carbon 3.10.1`. Bump those
 pins and re-check `tests/Stub/` against Leantime's own `composer.lock` when
 upgrading Leantime.
 
-## API Key
+The commands below are the same checks CI runs, spelled out so they can be run
+without Task.
 
-To use the plugin you need an API key for leantime.
+### Install
 
-See <https://docs.leantime.io/api/usage?id=connect>.
+```shell name=development-install
+docker run --interactive --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer install
+```
 
-The API should be set as a header for all requests to the API.
+### Composer normalize
 
-E.g.
+```shell name=composer-normalize
+docker run --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer normalize
+```
 
-```shell
-curl https://{{YOUR_DOMAIN}}/apidata/api/{{TYPE}}
-   -H "x-api-key: {{YOUR_APIKEY}}"
-   -H "Content-Type: application/json"
-   -d '{"start":0,"limit":100}'
+### Coding standards
+
+#### Check and apply with phpcs
+
+```shell name=check-coding-standards
+docker run --interactive --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer coding-standards-check
+```
+
+```shell name=apply-coding-standards
+docker run --interactive --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer coding-standards-apply
+```
+
+#### Check and apply markdownlint
+
+```shell name=markdown-check
+docker run --rm --volume "$PWD:/md" itkdev/markdownlint '**/*.md'
+```
+
+```shell name=markdown-apply
+docker run --rm --volume "$PWD:/md" itkdev/markdownlint '**/*.md' --fix
+```
+
+#### Check with shellcheck
+
+```shell name=shell-check
+docker run --rm --volume "$PWD:/app" --workdir /app peterdavehello/shellcheck shellcheck --external-sources --source-path=SCRIPTDIR bin/create-release
+docker run --rm --volume "$PWD:/app" --workdir /app peterdavehello/shellcheck shellcheck --external-sources --source-path=SCRIPTDIR bin/local.create-release
+```
+
+### Code analysis
+
+```shell name=code-analysis
+# This analysis takes a bit more than the default allocated ram.
+docker run --interactive --rm --volume ${PWD}:/app --env PHP_MEMORY_LIMIT=256M itkdev/php8.3-fpm:latest composer code-analysis
+```
+
+### Test release build
+
+```shell name=test-create-release
+docker compose build php-release && docker compose run --rm --no-deps php-release bin/create-release dev-test
 ```

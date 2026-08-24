@@ -17,36 +17,69 @@ class API extends Controller
 {
     private APIData $dataAPIService;
 
+    /**
+     * Inject the service, which Leantime resolves for us.
+     */
     public function init(APIData $dataAPIService): void
     {
         $this->dataAPIService = $dataAPIService;
     }
 
+    /**
+     * Answer with a page of deletions of one entity type.
+     *
+     * @param array<string, mixed> $input
+     */
     public function deleted(array $input): JsonResponse
     {
         return $this->respond(fn () => $this->getDeleted($input));
     }
 
+    /**
+     * Answer with a page of projects.
+     *
+     * @param array<string, mixed> $input
+     */
     public function projects(array $input): JsonResponse
     {
         return $this->respond(fn () => $this->getResults($input, APIData::TYPE_PROJECTS));
     }
 
+    /**
+     * Answer with a page of milestones.
+     *
+     * @param array<string, mixed> $input
+     */
     public function milestones(array $input): JsonResponse
     {
         return $this->respond(fn () => $this->getResults($input, APIData::TYPE_MILESTONES));
     }
 
+    /**
+     * Answer with a page of tickets, milestones excluded.
+     *
+     * @param array<string, mixed> $input
+     */
     public function tickets(array $input): JsonResponse
     {
         return $this->respond(fn () => $this->getResults($input, APIData::TYPE_TICKETS));
     }
 
+    /**
+     * Answer with a page of timesheet entries.
+     *
+     * @param array<string, mixed> $input
+     */
     public function timesheets(array $input): JsonResponse
     {
         return $this->respond(fn () => $this->getResults($input, APIData::TYPE_TIMESHEETS));
     }
 
+    /**
+     * Answer with a page of users, api users excluded.
+     *
+     * @param array<string, mixed> $input
+     */
     public function workers(array $input): JsonResponse
     {
         return $this->respond(fn () => $this->getResults($input, APIData::TYPE_WORKERS));
@@ -65,6 +98,13 @@ class API extends Controller
         }
     }
 
+    /**
+     * Resolve the deleted endpoint's parameters and wrap the page in a response body.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return array<string, mixed>
+     */
     private function getDeleted(array $input): array
     {
         $parameters = DeletedRequestParameters::fromInput($input);
@@ -83,6 +123,13 @@ class API extends Controller
         ))->toArray();
     }
 
+    /**
+     * Resolve an entity endpoint's parameters and wrap the page in a response body.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return array<string, mixed>
+     */
     private function getResults(array $input, string $type): array
     {
         $parameters = RequestParameters::fromInput($input);
@@ -93,6 +140,9 @@ class API extends Controller
             APIData::TYPE_TICKETS => $this->dataAPIService->getTickets($parameters->start, $parameters->limit, $parameters->modifiedAfter, $parameters->ids, $parameters->projectIds),
             APIData::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($parameters->start, $parameters->limit, $parameters->modifiedAfter, $parameters->ids, $parameters->projectIds),
             APIData::TYPE_WORKERS => $this->dataAPIService->getWorkers($parameters->start, $parameters->limit, $parameters->modifiedAfter, $parameters->ids),
+            // Every caller passes an APIData::TYPE_* constant, so reaching this
+            // is a bug here rather than bad input, and is not a 400.
+            default => throw new \InvalidArgumentException("Invalid type: $type"),
         };
 
         return (new ResponseData(
