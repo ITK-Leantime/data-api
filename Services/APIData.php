@@ -11,10 +11,11 @@ use Leantime\Plugins\APIData\Model\TicketData;
 use Leantime\Plugins\APIData\Model\TimesheetData;
 use Leantime\Plugins\APIData\Model\WorkerData;
 use Leantime\Plugins\APIData\Repositories\ApiDataRepository;
+use Leantime\Plugins\APIData\Repositories\SchemaRepository;
 
 /**
- * Business logic for the APIData plugin: exports projects, milestones, tickets,
- * timesheets, workers and deleted-entity entries as typed data objects.
+ * Turns the repository's database rows into the data transfer objects the
+ * endpoints answer with, and owns the plugin's install and uninstall hooks.
  */
 class APIData
 {
@@ -26,45 +27,38 @@ class APIData
     public const DATE_FORMAT = 'Y-m-d H:i:s';
 
     /**
-     * Inject the ticket and API data repositories.
+     * Inject the repositories the service reads and writes through.
      */
     public function __construct(
         private readonly TicketRepository $ticketRepository,
         private readonly ApiDataRepository $apiDataRepository,
+        private readonly SchemaRepository $schemaRepository,
     ) {
     }
 
     /**
-     * Create the deleted-entity tracking tables and triggers.
-     *
-     * @return void
+     * Leantime calls this on every install, and offers no separate upgrade hook,
+     * so SchemaRepository::install() has to be idempotent.
      */
     public function install(): void
     {
-        $this->apiDataRepository->setupTables();
+        $this->schemaRepository->install();
     }
 
     /**
-     * Remove the deleted-entity tracking triggers (tables are preserved).
-     *
-     * @return void
+     * Drop everything install() added.
      */
     public function uninstall(): void
     {
-        // The tables are intentionally left in place to preserve data through
-        // install/uninstall cycles; only the triggers are removed.
-        $this->apiDataRepository->removeTriggers();
+        $this->schemaRepository->uninstall();
     }
 
     /**
-     * Fetch projects mapped to ProjectData models.
+     * Export a page of projects.
      *
-     * @param int                         $startId       Lowest project id to include.
-     * @param int                         $limit         Maximum number of rows to return.
-     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
-     * @param array<int, int|string>|null $ids           Optional list of project ids to filter by.
+     * @param list<int>|null $ids
      *
-     * @return array<int, ProjectData>
+     * @return list<ProjectData>
      */
     public function getProjects(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
@@ -80,17 +74,14 @@ class APIData
     }
 
     /**
-     * Fetch milestones mapped to MilestoneData models.
+     * Export a page of milestones.
      *
-     * @param int                         $startId       Lowest ticket id to include.
-     * @param int                         $limit         Maximum number of rows to return.
-     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
-     * @param array<int, int|string>|null $ids           Optional list of ticket ids to filter by.
-     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
      *
-     * @return array<int, MilestoneData>
+     * @return list<MilestoneData>
      */
-    public function getMilestones(int $startId, int $limit, int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
+    public function getMilestones(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getMilestones($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
@@ -105,22 +96,29 @@ class APIData
     }
 
     /**
-     * Fetch tickets mapped to TicketData models.
+     * Export a page of tickets, milestones excluded.
      *
-     * @param int                         $startId       Lowest ticket id to include.
-     * @param int                         $limit         Maximum number of rows to return.
-     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
-     * @param array<int, int|string>|null $ids           Optional list of ticket ids to filter by.
-     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
      *
-     * @return array<int, TicketData>
+     * @return list<TicketData>
      */
-    public function getTickets(int $startId, int $limit, int $modifiedAfter = null, array $ids = null, ?array $projectIds = null): array
+    public function getTickets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getTickets($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
-        return array_map(function ($value) {
-            $projectStatuses = $this->ticketRepository->getStateLabels($value->projectId);
+        // Tickets arrive in batches from the same handful of projects, so the
+        // labels are looked up once per project instead of once per ticket. Kept
+        // local to the call, since labels can change between requests.
+        $statusesByProject = [];
+
+        return array_map(function ($value) use (&$statusesByProject) {
+            // Asked for labels without a project id, Leantime falls back to
+            // session('currentProject'), which would resolve the status against
+            // an unrelated project.
+            $projectStatuses = $value->projectId !== null
+                ? $statusesByProject[$value->projectId] ??= $this->ticketRepository->getStateLabels($value->projectId)
+                : [];
 
             return new TicketData(
                 $value->id,
@@ -140,98 +138,89 @@ class APIData
     }
 
     /**
-     * Fetch timesheets mapped to TimesheetData models.
+     * Export a page of timesheet entries.
      *
-     * @param int                         $startId       Lowest timesheet id to include.
-     * @param int                         $limit         Maximum number of rows to return.
-     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
-     * @param array<int, int|string>|null $ids           Optional list of timesheet ids to filter by.
-     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
      *
-     * @return array<int, TimesheetData>
+     * @return list<TimesheetData>
      */
     public function getTimesheets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         $values = $this->apiDataRepository->getTimesheets($startId, $limit, $modifiedAfter, $ids, $projectIds);
 
         return array_map(function ($value) {
+            // Named arguments: CarbonImmutable has a __toString(), so a
+            // mis-ordered date would be coerced into one of the string
+            // parameters instead of raising a TypeError.
             return new TimesheetData(
-                $value->id,
-                $value->ticketId,
-                $value->projectId,
-                $value->description,
-                $value->hours,
-                $value->username,
-                $value->kind,
-                $this->getCarbonFromDatabaseValue($value->workDate),
-                $this->getCarbonFromDatabaseValue($value->modified),
+                id: $value->id,
+                ticketId: $value->ticketId,
+                projectId: $value->projectId,
+                description: $value->description,
+                hours: $value->hours,
+                userId: $value->userId,
+                username: $value->username,
+                kind: $value->kind,
+                workDate: $this->getCarbonFromDatabaseValue($value->workDate),
+                modified: $this->getCarbonFromDatabaseValue($value->modified),
             );
         }, $values);
     }
 
     /**
-     * Fetch workers mapped to WorkerData models.
+     * Export a page of users.
      *
-     * @param int                         $startId       Lowest user id to include.
-     * @param int                         $limit         Maximum number of rows to return.
-     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
-     * @param array<int, int|string>|null $ids           Optional list of user ids to filter by.
-     * @param array<int, int|string>|null $projectIds    Accepted for interface symmetry; workers are not project-scoped.
+     * @param list<int>|null $ids
      *
-     * @return array<int, WorkerData>
+     * @return list<WorkerData>
      */
-    public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
+    public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         $values = $this->apiDataRepository->getWorkers($startId, $limit, $modifiedAfter, $ids);
 
         return array_map(function ($value) {
             return new WorkerData(
-                $value->id,
-                $value->username,
-                $value->name,
+                id: $value->id,
+                email: $value->username,
+                name: $value->name,
+                modified: $this->getCarbonFromDatabaseValue($value->modified),
             );
         }, $values);
     }
 
     /**
-     * Fetch deleted-entity entries mapped to DeletedData models.
+     * Export a page of deletions of one entity type.
      *
-     * @param string   $type         One of the APIData::TYPE_* constants.
-     * @param int|null $deletedAfter Optional unix timestamp lower bound.
-     *
-     * @return array<int, DeletedData>
+     * @return list<DeletedData>
      */
-    public function getDeleted(string $type, ?int $deletedAfter = null): array
+    public function getDeleted(string $type, int $startId, int $limit, ?int $deletedAfter = null): array
     {
-        $values = $this->apiDataRepository->getDeleted($type, $deletedAfter);
+        $values = $this->apiDataRepository->getDeleted($type, $startId, $limit, $deletedAfter);
 
+        // Named arguments: the row's `id` is the deletion's own id and `entryId`
+        // the deleted entity's, and both are ints, so a swap would map cleanly
+        // onto the wrong field instead of raising a TypeError.
         return array_map(fn ($entry) => new DeletedData(
-            $entry->entryId,
-            $this->getCarbonFromDatabaseValue($entry->dateDeleted),
+            deletionId: $entry->id,
+            id: $entry->entryId,
+            deletedDate: $this->getCarbonFromDatabaseValue($entry->dateDeleted),
         ), $values);
     }
 
     /**
-     * Parse a database datetime value into a CarbonImmutable, or null.
-     *
-     * @param mixed $value Raw database value (datetime string or null).
-     *
-     * @return CarbonImmutable|null
+     * Read a UTC database datetime, treating null and the zero date as absent.
      */
     private function getCarbonFromDatabaseValue(mixed $value): ?CarbonImmutable
     {
         // "0000-00-00 00:00:00" equals null.
         return $value !== null && $value !== "0000-00-00 00:00:00"
-            ? CarbonImmutable::createFromFormat(APIData::DATE_FORMAT, (string) $value, 'UTC')
+            ? CarbonImmutable::createFromFormat(APIData::DATE_FORMAT, $value, 'UTC')
             : null;
     }
 
     /**
-     * Resolve a ticket's milestone id, treating 0 as null.
-     *
-     * @param mixed $value Row containing a milestoneid property.
-     *
-     * @return int|null
+     * Read a ticket row's milestone id, treating the zero id as absent.
      */
     private function getMilestoneId(mixed $value): ?int
     {

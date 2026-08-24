@@ -1,20 +1,40 @@
 on: pull_request
+
 name: Review
+
+# The checkout belongs to the runner, so the container writes to the bind mount
+# as `runner` rather than as the image's `deploy` user.
+env:
+  COMPOSE_USER: runner
+
 jobs:
   changelog:
     runs-on: ubuntu-latest
     name: Changelog should be updated
-    strategy:
-      fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Git fetch
         run: git fetch
 
       - name: Check that changelog has been updated.
         run: git diff --exit-code origin/${{ github.base_ref }} -- CHANGELOG.md && exit 1 || exit 0
+
+  test:
+    runs-on: ubuntu-latest
+    name: Unit tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Tests run in the project's own compose stack, so the PHP version comes
+      # from compose.yml rather than being repeated here.
+      - name: Install dependencies
+        run: docker compose run --rm --no-deps phpfpm composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run tests
+        run: docker compose run --rm --no-deps phpfpm vendor/bin/phpunit
 
   run-code-blocks-from-readme:
     runs-on: ubuntu-latest
@@ -29,7 +49,7 @@ jobs:
           - development-install test-create-release
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
           fetch-depth: 0

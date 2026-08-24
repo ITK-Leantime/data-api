@@ -5,7 +5,7 @@ namespace Leantime\Plugins\APIData\Model;
 use Carbon\CarbonInterface;
 
 /**
- * Data transfer object for a timesheet exported through the API.
+ * A single timesheet entry, as the timesheets endpoint exports it.
  */
 readonly class TimesheetData
 {
@@ -14,12 +14,13 @@ readonly class TimesheetData
      */
     public function __construct(
         public int $id,
-        public int $ticketId,
-        public int $projectId,
+        public ?int $ticketId,
+        public ?int $projectId,
         public ?string $description,
         public float $hours,
-        public string $username,
-        public string $kind,
+        public ?int $userId,
+        public ?string $username,
+        public ?string $kind,
         public ?CarbonInterface $workDate = null,
         public ?CarbonInterface $modified = null,
     ) {

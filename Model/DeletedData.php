@@ -5,16 +5,19 @@ namespace Leantime\Plugins\APIData\Model;
 use Carbon\CarbonInterface;
 
 /**
- * Data transfer object for a deleted-entity entry exported through the API.
+ * A single deletion. `deletionId` is the deleted table's own row id, which the
+ * caller feeds back as `start` to page on; `id` is the id of the entity that was
+ * deleted, and is nullable because the tracking tables allow it.
  */
-class DeletedData
+readonly class DeletedData
 {
     /**
      * Create the deleted-entity data transfer object.
      */
     public function __construct(
-        public int $id,
-        public CarbonInterface $deletedDate,
+        public ?int $deletionId,
+        public ?int $id,
+        public ?CarbonInterface $deletedDate,
     ) {
     }
 }

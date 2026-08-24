@@ -31,13 +31,28 @@
         <exclude name="Squiz.Commenting.FunctionComment.EmptyThrows" />
         <exclude name="Squiz.Commenting.VariableComment.MissingReturn" />
         <exclude name="Squiz.Commenting.FunctionComment.ParamCommentNotCapital" />
+
+        <!-- The signature carries the types, so a docblock only has to add what
+             the signature cannot say: array shapes, and why. MissingParamTag is
+             excluded above for that reason; ParamNameNoMatch matches a partial
+             @param list positionally, which makes that exclusion unusable, and
+             MissingReturn demands a tag that only repeats the return type. -->
+        <exclude name="Squiz.Commenting.FunctionComment.ParamNameNoMatch" />
+        <exclude name="Squiz.Commenting.FunctionComment.MissingReturn" />
+
+        <!-- A test method's name is its documentation, and the arrange/act/assert
+             body is the rest of it. Everything else in this ruleset still applies
+             to tests. -->
+        <exclude-pattern>tests/</exclude-pattern>
     </rule>
 
     <rule ref="Squiz.Commenting.FunctionCommentThrowTag">
         <exclude name="Squiz.Commenting.FunctionCommentThrowTag.Missing" />
     </rule>
 
-    <rule ref="Squiz.Commenting.ClassComment" />
+    <rule ref="Squiz.Commenting.ClassComment">
+        <exclude-pattern>tests/</exclude-pattern>
+    </rule>
 
     <rule ref="Squiz.Commenting.VariableComment" >
         <!-- Put back in at some point -->

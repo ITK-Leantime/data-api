@@ -8,14 +8,12 @@ use Illuminate\Support\Facades\DB;
 use Leantime\Plugins\APIData\Services\APIData;
 
 /**
- * Data access for the APIData plugin's export queries and deleted-entity tracking.
+ * Data access for the export endpoints and the deletion tracking tables.
  */
 class ApiDataRepository
 {
     /**
-     * Build a fresh query builder on the default connection.
-     *
-     * @return Builder
+     * Start a query on the default connection.
      */
     private function query(): Builder
     {
@@ -23,22 +21,19 @@ class ApiDataRepository
     }
 
     /**
-     * Fetch projects.
+     * Read a page of project rows.
      *
-     * @param int                         $startId       Lowest project id to include.
-     * @param int                         $limit         Maximum number of rows to return.
-     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
-     * @param array<int, int|string>|null $ids           Optional list of project ids to filter by.
+     * @param list<int>|null $ids
      *
-     * @return array<int, \stdClass>
+     * @return list<object>
      */
     public function getProjects(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         return $this->query()
-            ->select(["id", "name", "modified"])
+            ->select(["project.id", "project.name", $this->modifiedSelect("project")])
             ->from("zp_projects", "project")
             ->where("project.id", ">=", $startId)
-            ->when($modifiedAfter !== null, fn ($query) => $query->where("project.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
+            ->when($modifiedAfter !== null, fn ($query) => $query->where($this->modified("project"), ">=", $this->cutoff($modifiedAfter)))
             ->when($ids !== null, fn ($query) => $query->whereIn("project.id", $ids))
             ->orderBy("id", "ASC")
             ->limit($limit)
@@ -47,26 +42,23 @@ class ApiDataRepository
     }
 
     /**
-     * Fetch milestones (tickets of type "milestone").
+     * Read a page of milestone rows.
      *
-     * @param int                         $startId       Lowest ticket id to include.
-     * @param int                         $limit         Maximum number of rows to return.
-     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
-     * @param array<int, int|string>|null $ids           Optional list of ticket ids to filter by.
-     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
      *
-     * @return array<int, \stdClass>
+     * @return list<object>
      */
-    public function getMilestones(int $startId, int $limit, int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
+    public function getMilestones(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
-            ->select(["id", "headline", "projectId", "modified"])
+            ->select(["ticket.id", "ticket.headline", "ticket.projectId", $this->modifiedSelect("ticket")])
             ->from("zp_tickets", "ticket")
             ->where("ticket.id", ">=", $startId)
             ->where("ticket.type", "=", "milestone")
-            ->when($modifiedAfter !== null, fn ($query) => $query->where("ticket.date", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
+            ->when($modifiedAfter !== null, fn ($query) => $query->where($this->modified("ticket"), ">=", $this->cutoff($modifiedAfter)))
             ->when($ids !== null, fn ($query) => $query->whereIn("ticket.id", $ids))
-            ->when($projectIds != null, fn ($query) => $query->whereIn("ticket.projectId", $projectIds))
+            ->when($projectIds !== null, fn ($query) => $query->whereIn("ticket.projectId", $projectIds))
             ->orderBy("id", "ASC")
             ->limit($limit)
             ->get()
@@ -74,27 +66,24 @@ class ApiDataRepository
     }
 
     /**
-     * Fetch tickets (excluding milestones).
+     * Read a page of ticket rows, milestones excluded.
      *
-     * @param int                         $startId       Lowest ticket id to include.
-     * @param int                         $limit         Maximum number of rows to return.
-     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
-     * @param array<int, int|string>|null $ids           Optional list of ticket ids to filter by.
-     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
      *
-     * @return array<int, \stdClass>
+     * @return list<object>
      */
-    public function getTickets(int $startId, int $limit, int $modifiedAfter = null, array $ids = null, ?array $projectIds = null): array
+    public function getTickets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
-            ->select(["ticket.id", "ticket.headline", "ticket.projectId", "ticket.status", "ticket.planHours", "ticket.hourRemaining", "ticket.tags", "ticket.dateToFinish", "ticket.editTo", "ticket.milestoneid", "ticket.modified", "user.username"])
+            ->select(["ticket.id", "ticket.headline", "ticket.projectId", "ticket.status", "ticket.planHours", "ticket.hourRemaining", "ticket.tags", "ticket.dateToFinish", "ticket.editTo", "ticket.milestoneid", $this->modifiedSelect("ticket"), "user.username"])
             ->from("zp_tickets", "ticket")
             ->where("ticket.id", ">=", $startId)
             ->where("ticket.type", "<>", "milestone")
             ->leftJoin('zp_user as user', "user.id", "=", "ticket.editorId")
-            ->when($modifiedAfter !== null, fn ($query) => $query->where("ticket.date", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
+            ->when($modifiedAfter !== null, fn ($query) => $query->where($this->modified("ticket"), ">=", $this->cutoff($modifiedAfter)))
             ->when($ids !== null, fn ($query) => $query->whereIn("ticket.id", $ids))
-            ->when($projectIds != null, fn ($query) => $query->whereIn("ticket.projectId", $projectIds))
+            ->when($projectIds !== null, fn ($query) => $query->whereIn("ticket.projectId", $projectIds))
             ->orderBy("id", "ASC")
             ->limit($limit)
             ->get()
@@ -102,28 +91,25 @@ class ApiDataRepository
     }
 
     /**
-     * Fetch timesheets.
+     * Read a page of timesheet rows.
      *
-     * @param int                         $startId       Lowest timesheet id to include.
-     * @param int                         $limit         Maximum number of rows to return.
-     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
-     * @param array<int, int|string>|null $ids           Optional list of timesheet ids to filter by.
-     * @param array<int, int|string>|null $projectIds    Optional list of project ids to filter by.
+     * @param list<int>|null $ids
+     * @param list<int>|null $projectIds
      *
-     * @return array<int, \stdClass>
+     * @return list<object>
      */
     public function getTimesheets(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null, ?array $projectIds = null): array
     {
         return $this->query()
             ->from("zp_timesheets", "timesheet")
-            ->select(["timesheet.id", "timesheet.description", "timesheet.hours", "timesheet.workDate", "timesheet.modified", "timesheet.ticketId", "timesheet.kind", "user.username", "ticket.projectId"])
+            ->select(["timesheet.id", "timesheet.description", "timesheet.hours", "timesheet.workDate", $this->modifiedSelect("timesheet"), "timesheet.ticketId", "timesheet.userId", "timesheet.kind", "user.username", "ticket.projectId"])
             ->where("timesheet.id", ">=", $startId)
             ->whereNotNull("timesheet.hours")
             ->leftJoin('zp_user as user', "user.id", "=", "timesheet.userId")
             ->leftJoin('zp_tickets as ticket', "ticket.id", "=", "timesheet.ticketId")
-            ->when($modifiedAfter !== null, fn ($query) => $query->where("timesheet.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
+            ->when($modifiedAfter !== null, fn ($query) => $query->where($this->modified("timesheet"), ">=", $this->cutoff($modifiedAfter)))
             ->when($ids !== null, fn ($query) => $query->whereIn("timesheet.id", $ids))
-            ->when($projectIds != null, fn ($query) => $query->whereIn("ticket.projectId", $projectIds))
+            ->when($projectIds !== null, fn ($query) => $query->whereIn("ticket.projectId", $projectIds))
             ->orderBy("timesheet.id", "ASC")
             ->limit($limit)
             ->get()
@@ -131,23 +117,23 @@ class ApiDataRepository
     }
 
     /**
-     * Fetch workers (non-API users).
+     * Read a page of user rows.
      *
-     * @param int                         $startId       Lowest user id to include.
-     * @param int                         $limit         Maximum number of rows to return.
-     * @param int|null                    $modifiedAfter Optional unix timestamp lower bound.
-     * @param array<int, int|string>|null $ids           Optional list of user ids to filter by.
+     * @param list<int>|null $ids
      *
-     * @return array<int, \stdClass>
+     * @return list<object>
      */
     public function getWorkers(int $startId, int $limit, ?int $modifiedAfter = null, ?array $ids = null): array
     {
         return $this->query()
             ->from("zp_user", "worker")
-            ->select(["worker.id", "worker.username", DB::raw("CONCAT(worker.firstname, ' ', worker.lastname) as name")])
+            // CONCAT_WS skips a missing name part, so a worker with only a
+            // firstname keeps a usable name. NULLIF turns an all-blank name into
+            // null rather than a string of whitespace.
+            ->select(["worker.id", "worker.username", DB::raw("NULLIF(TRIM(CONCAT_WS(' ', worker.firstname, worker.lastname)), '') as name"), $this->modifiedSelect("worker")])
             ->where("worker.id", ">=", $startId)
             ->where("worker.source", "<>", "api")
-            ->when($modifiedAfter !== null, fn ($query) => $query->where("worker.modified", ">=", CarbonImmutable::createFromTimestamp($modifiedAfter)->format(APIData::DATE_FORMAT)))
+            ->when($modifiedAfter !== null, fn ($query) => $query->where($this->modified("worker"), ">=", $this->cutoff($modifiedAfter)))
             ->when($ids !== null, fn ($query) => $query->whereIn("worker.id", $ids))
             ->orderBy("worker.id", "ASC")
             ->limit($limit)
@@ -156,14 +142,13 @@ class ApiDataRepository
     }
 
     /**
-     * Fetch deleted-entity tracking entries for a given type.
+     * Paged on the tracking table's own row id rather than on `entryId`: rows are
+     * appended as entities are deleted, so `id` is the only column that both
+     * orders them and stays put while a client pages through.
      *
-     * @param string   $type         One of the APIData::TYPE_* constants.
-     * @param int|null $deletedAfter Optional unix timestamp lower bound.
-     *
-     * @return array<int, \stdClass>
+     * @return list<object>
      */
-    public function getDeleted(string $type, ?int $deletedAfter = null): array
+    public function getDeleted(string $type, int $startId, int $limit, ?int $deletedAfter = null): array
     {
         $tableName = match ($type) {
             APIData::TYPE_PROJECTS => 'itk_projects_deleted',
@@ -174,88 +159,43 @@ class ApiDataRepository
 
         return $this->query()
             ->from($tableName, "entry")
-            ->select(["entryId", "dateDeleted"])
+            ->select(["entry.id", "entry.entryId", "entry.dateDeleted"])
+            ->where("entry.id", ">=", $startId)
             ->when($type === APIData::TYPE_MILESTONES, fn ($query) => $query->where('type', '=', 'milestone'))
             ->when($type === APIData::TYPE_TICKETS, fn ($query) => $query->where('type', '<>', 'milestone'))
-            ->when($deletedAfter !== null, fn ($query) => $query->where("entry.dateDeleted", ">=", CarbonImmutable::createFromTimestamp($deletedAfter)->format(APIData::DATE_FORMAT)))
+            ->when($deletedAfter !== null, fn ($query) => $query->where("entry.dateDeleted", ">=", $this->cutoff($deletedAfter)))
+            ->orderBy("entry.id", "ASC")
+            ->limit($limit)
             ->get()
             ->toArray();
     }
 
     /**
-     * Create the deleted-entity tracking tables and their triggers.
-     *
-     * Uses unprepared() because this is multi-statement DDL: the CREATE TRIGGER
-     * bodies contain their own statement terminators, which a prepared statement
-     * cannot handle.
-     *
-     * @return void
+     * The plugin-owned timestamp column, qualified by the query's table alias.
+     * Core's own `modified` is not maintained on every write path, so it cannot
+     * carry the modifiedAfter contract — see SchemaRepository.
      */
-    public function setupTables(): void
+    private function modified(string $alias): string
     {
-        app('db')->connection()->unprepared(<<<'SQL'
-            CREATE TABLE IF NOT EXISTS `itk_projects_deleted` (
-                `id` int(11) NOT NULL AUTO_INCREMENT,
-                `entryId` int(11) DEFAULT NULL,
-                `dateDeleted` datetime DEFAULT NOW(),
-                PRIMARY KEY (`id`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-            CREATE TABLE IF NOT EXISTS `itk_tickets_deleted` (
-                `id` int(11) NOT NULL AUTO_INCREMENT,
-                `entryId` int(11) DEFAULT NULL,
-                `type` varchar(255) DEFAULT NULL,
-                `dateDeleted` datetime DEFAULT NOW(),
-                PRIMARY KEY (`id`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-            CREATE TABLE IF NOT EXISTS `itk_timesheets_deleted` (
-                `id` int(11) NOT NULL AUTO_INCREMENT,
-                `entryId` int(11) DEFAULT NULL,
-                `dateDeleted` datetime DEFAULT NOW(),
-                PRIMARY KEY (`id`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-            CREATE TRIGGER itk_projects_deleted_trigger
-            AFTER DELETE ON zp_projects
-            FOR EACH ROW
-            BEGIN
-               INSERT INTO itk_projects_deleted(entryId)
-               VALUES (OLD.id);
-            END;
-
-            CREATE TRIGGER itk_tickets_deleted_trigger
-            AFTER DELETE ON zp_tickets
-            FOR EACH ROW
-            BEGIN
-               INSERT INTO itk_tickets_deleted(entryId, type)
-               VALUES (OLD.id, OLD.type);
-            END;
-
-            CREATE TRIGGER itk_timesheets_deleted_trigger
-            AFTER DELETE ON zp_timesheets
-            FOR EACH ROW
-            BEGIN
-               INSERT INTO itk_timesheets_deleted(entryId)
-               VALUES (OLD.id);
-            END;
-        SQL);
+        return sprintf('%s.%s', $alias, SchemaRepository::COLUMN);
     }
 
     /**
-     * Drop the deleted-entity tracking triggers.
-     *
-     * The tables are intentionally left in place so their data survives an
-     * install/uninstall cycle.
-     *
-     * @return void
+     * Exposed to consumers as plain `modified`, so the column swap is invisible
+     * to them and to the mapping in APIData.
      */
-    public function removeTriggers(): void
+    private function modifiedSelect(string $alias): string
     {
-        app('db')->connection()->unprepared(<<<'SQL'
-            DROP TRIGGER itk_projects_deleted_trigger;
-            DROP TRIGGER itk_tickets_deleted_trigger;
-            DROP TRIGGER itk_timesheets_deleted_trigger;
-        SQL);
+        return sprintf('%s as modified', $this->modified($alias));
+    }
+
+    /**
+     * Render a unix timestamp as the UTC datetime string the columns hold.
+     */
+    private function cutoff(int $timestamp): string
+    {
+        // Explicit UTC: Carbon 3 defaults to it, but Carbon comes from the host
+        // Leantime install, and the triggers write UTC_TIMESTAMP().
+        return CarbonImmutable::createFromTimestamp($timestamp, 'UTC')->format(APIData::DATE_FORMAT);
     }
 }

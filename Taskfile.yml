@@ -1,46 +1,89 @@
+# https://taskfile.dev — install with `brew install go-task` (or see docs).
+# Run `task` (or `task --list-all`) to see all available commands.
+#
+# This plugin has no long-running stack, so everything runs in a one-off
+# itkdev/php8.3-fpm container.
+
 version: "3"
 
 vars:
   # https://taskfile.dev/reference/templating/
-  DOCKER_COMPOSE: '{{.TASK_DOCKER_COMPOSE | default "docker compose"}}'
+  DOCKER_COMPOSE: '{{ .TASK_DOCKER_COMPOSE | default "docker compose" }}'
 
 tasks:
   default:
-    desc: List available tasks
+    desc: List all tasks
     cmds:
-      - task --list
+      - task --list-all
     silent: true
 
-  compose:
-    desc: Run a docker compose command, e.g. task compose -- run --rm php composer install
-    cmds:
-      - "{{.DOCKER_COMPOSE}} {{.CLI_ARGS}}"
+  # -------------------------------------------------------------- Wrappers ---
 
-  composer:install:
-    desc: Install PHP dependencies
+  compose:
+    desc: "Run a docker compose command. Example: task compose -- config."
     cmds:
-      - docker run --interactive --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer install
+      - "{{ .DOCKER_COMPOSE }} {{ .CLI_ARGS }}"
+
+  php:
+    desc: "Run a command in a one-off php container. Example: task php -- php --version."
+    cmds:
+      - task compose -- run --rm --no-deps phpfpm {{ .CLI_ARGS }}
+    silent: true
+
+  composer:
+    desc: "Run a composer command. Example: task composer -- install."
+    cmds:
+      - task php -- composer {{ .CLI_ARGS }}
+    silent: true
+
+  # ------------------------------------------------------------ Lifecycle ---
+
+  setup:
+    desc: Install dev dependencies.
+    cmds:
+      - task composer -- install
 
   composer:normalize:
-    desc: Normalize composer.json
+    desc: Normalize composer.json.
     cmds:
-      - docker run --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer normalize
+      - task composer -- normalize
+
+  # ------------------------------------------------------------ PHP tests ---
+
+  test:
+    desc: "Run the PHP test suite. Example: task test -- --filter TimesheetData."
+    cmds:
+      - task php -- vendor/bin/phpunit {{ .CLI_ARGS }}
+    silent: true
+
+  lint:
+    desc: Syntax-check all PHP files.
+    cmds:
+      - >-
+        task php -- sh -c
+        'find Controllers Model Repositories Services -name "*.php" -print0
+        | xargs -0 -n1 -- php -l'
+    silent: true
+
+  # ------------------------------------------------------------- Analysis ---
 
   code-analysis:
-    desc: Run static analysis (phpstan)
+    desc: Run static analysis (phpstan).
+    env:
+      PHP_MEMORY_LIMIT: 256M
     cmds:
-      - docker run --interactive --rm --volume ${PWD}:/app --env PHP_MEMORY_LIMIT=256M itkdev/php8.3-fpm:latest composer code-analysis 
+      - task composer -- code-analysis
 
   coding-standards:check:
-    desc: Run all coding standards checks
+    desc: Check coding standards across PHP, markdown and shell.
     cmds:
-      - docker run --interactive --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer coding-standards-check
+      - task composer -- coding-standards-check
       - docker run --rm --volume "$PWD:/md" itkdev/markdownlint '**/*.md'
       - docker run --rm --volume "$PWD:/app" --workdir /app peterdavehello/shellcheck shellcheck --external-sources --source-path=SCRIPTDIR bin/create-release
       - docker run --rm --volume "$PWD:/app" --workdir /app peterdavehello/shellcheck shellcheck --external-sources --source-path=SCRIPTDIR bin/local.create-release
 
   coding-standards:apply:
-    desc: Apply all coding standards fixes
+    desc: Apply coding standards fixes across PHP and markdown.
     cmds:
-      - docker run --interactive --rm --volume ${PWD}:/app itkdev/php8.3-fpm:latest composer coding-standards-apply
+      - task composer -- coding-standards-apply
       - docker run --rm --volume "$PWD:/md" itkdev/markdownlint '**/*.md' --fix

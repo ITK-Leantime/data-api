@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(task test:*)",
+      "Bash(task composer:*)",
+      "Bash(task lint:*)"
+    ]
+  }
+}

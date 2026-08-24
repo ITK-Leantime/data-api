@@ -1,5 +1,19 @@
 services:
-  php:
+  # Tests, linting and composer run straight on the itkdev image — nothing in
+  # that path needs anything added to it.
+  phpfpm:
+    image: itkdev/php8.3-fpm:latest
+    working_dir: /app
+    # `deploy` is right locally, where Docker Desktop masks the ownership of the
+    # bind mount. On a Linux CI runner the checkout belongs to `runner`, so CI
+    # sets COMPOSE_USER to it — otherwise composer cannot create `vendor`.
+    user: ${COMPOSE_USER:-deploy}
+    volumes:
+      - .:/app
+
+  # Only `bin/create-release` needs the built image, for the rsync it adds.
+  php-release:
     build: .
+    working_dir: /app
     volumes:
       - .:/app

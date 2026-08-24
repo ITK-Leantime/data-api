@@ -3,6 +3,9 @@
 namespace Leantime\Plugins\APIData\Controllers;
 
 use Leantime\Core\Controller\Controller;
+use Leantime\Plugins\APIData\Model\BadRequestException;
+use Leantime\Plugins\APIData\Model\DeletedRequestParameters;
+use Leantime\Plugins\APIData\Model\RequestParameters;
 use Leantime\Plugins\APIData\Model\ResponseData;
 use Leantime\Plugins\APIData\Services\APIData;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -15,11 +18,7 @@ class API extends Controller
     private APIData $dataAPIService;
 
     /**
-     * Inject the APIData service.
-     *
-     * @param APIData $dataAPIService
-     *
-     * @return void
+     * Inject the service, which Leantime resolves for us.
      */
     public function init(APIData $dataAPIService): void
     {
@@ -27,79 +26,80 @@ class API extends Controller
     }
 
     /**
-     * Return deleted-entity entries for the requested types.
+     * Answer with a page of deletions of one entity type.
      *
      * @param array<string, mixed> $input
-     *
-     * @return JsonResponse
      */
     public function deleted(array $input): JsonResponse
     {
-        return new JsonResponse($this->getDeleted($input));
+        return $this->respond(fn () => $this->getDeleted($input));
     }
 
     /**
-     * Return projects.
+     * Answer with a page of projects.
      *
      * @param array<string, mixed> $input
-     *
-     * @return JsonResponse
      */
     public function projects(array $input): JsonResponse
     {
-        return new JsonResponse($this->getResults($input, APIData::TYPE_PROJECTS));
+        return $this->respond(fn () => $this->getResults($input, APIData::TYPE_PROJECTS));
     }
 
     /**
-     * Return milestones.
+     * Answer with a page of milestones.
      *
      * @param array<string, mixed> $input
-     *
-     * @return JsonResponse
      */
     public function milestones(array $input): JsonResponse
     {
-        return new JsonResponse($this->getResults($input, APIData::TYPE_MILESTONES));
+        return $this->respond(fn () => $this->getResults($input, APIData::TYPE_MILESTONES));
     }
 
     /**
-     * Return tickets.
+     * Answer with a page of tickets, milestones excluded.
      *
      * @param array<string, mixed> $input
-     *
-     * @return JsonResponse
      */
     public function tickets(array $input): JsonResponse
     {
-        return new JsonResponse($this->getResults($input, APIData::TYPE_TICKETS));
+        return $this->respond(fn () => $this->getResults($input, APIData::TYPE_TICKETS));
     }
 
     /**
-     * Return timesheets.
+     * Answer with a page of timesheet entries.
      *
      * @param array<string, mixed> $input
-     *
-     * @return JsonResponse
      */
     public function timesheets(array $input): JsonResponse
     {
-        return new JsonResponse($this->getResults($input, APIData::TYPE_TIMESHEETS));
+        return $this->respond(fn () => $this->getResults($input, APIData::TYPE_TIMESHEETS));
     }
 
     /**
-     * Return workers.
+     * Answer with a page of users, api users excluded.
      *
      * @param array<string, mixed> $input
-     *
-     * @return JsonResponse
      */
     public function workers(array $input): JsonResponse
     {
-        return new JsonResponse($this->getResults($input, APIData::TYPE_WORKERS));
+        return $this->respond(fn () => $this->getResults($input, APIData::TYPE_WORKERS));
     }
 
     /**
-     * Build the deleted-entity response payload.
+     * A parameter the caller got wrong is their error, not ours, so it answers
+     * 400 with the reason instead of Leantime's 500 error page.
+     */
+    private function respond(callable $resolve): JsonResponse
+    {
+        try {
+            return new JsonResponse($resolve());
+        } catch (BadRequestException $exception) {
+            return new JsonResponse(['error' => $exception->getMessage()], JsonResponse::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Resolve the deleted endpoint's parameters and wrap the page in a response body.
      *
      * @param array<string, mixed> $input
      *
@@ -107,57 +107,46 @@ class API extends Controller
      */
     private function getDeleted(array $input): array
     {
-        $types = $input['types'];
-        $deleted = $input['deleted'] ?? null;
+        $parameters = DeletedRequestParameters::fromInput($input);
 
-        $deletedEntries = [];
-        $count = 0;
-
-        foreach ($types as $type) {
-            $deletedEntries[$type] = $this->dataAPIService->getDeleted($type, $deleted);
-            $count = $count + count($deletedEntries[$type]);
-        }
+        $results = $this->dataAPIService->getDeleted(
+            $parameters->type,
+            $parameters->start,
+            $parameters->limit,
+            $parameters->deletedAfter,
+        );
 
         return (new ResponseData(
-            ['types' => $types],
-            $count,
-            $deletedEntries,
+            $parameters->toArray(),
+            count($results),
+            $results,
         ))->toArray();
     }
 
     /**
-     * Build the results response payload for a given type.
+     * Resolve an entity endpoint's parameters and wrap the page in a response body.
      *
      * @param array<string, mixed> $input
-     * @param string               $type  One of the APIData::TYPE_* constants.
      *
      * @return array<string, mixed>
      */
     private function getResults(array $input, string $type): array
     {
-        $start = (int) ($input['start'] ?? 0);
-        $limit = (int) ($input['limit'] ?? 100);
-        $modifiedAfter = $input['modifiedAfter'] ?? null;
-        $ids = $input['ids'] ?? null;
-        $projectIds = $input['projectIds'] ?? null;
+        $parameters = RequestParameters::fromInput($input);
 
         $results = match ($type) {
-            APIData::TYPE_PROJECTS => $this->dataAPIService->getProjects($start, $limit, $modifiedAfter, $ids),
-            APIData::TYPE_MILESTONES => $this->dataAPIService->getMilestones($start, $limit, $modifiedAfter, $ids, $projectIds),
-            APIData::TYPE_TICKETS => $this->dataAPIService->getTickets($start, $limit, $modifiedAfter, $ids, $projectIds),
-            APIData::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($start, $limit, $modifiedAfter, $ids, $projectIds),
-            APIData::TYPE_WORKERS => $this->dataAPIService->getWorkers($start, $limit, $modifiedAfter, $ids),
+            APIData::TYPE_PROJECTS => $this->dataAPIService->getProjects($parameters->start, $parameters->limit, $parameters->modifiedAfter, $parameters->ids),
+            APIData::TYPE_MILESTONES => $this->dataAPIService->getMilestones($parameters->start, $parameters->limit, $parameters->modifiedAfter, $parameters->ids, $parameters->projectIds),
+            APIData::TYPE_TICKETS => $this->dataAPIService->getTickets($parameters->start, $parameters->limit, $parameters->modifiedAfter, $parameters->ids, $parameters->projectIds),
+            APIData::TYPE_TIMESHEETS => $this->dataAPIService->getTimesheets($parameters->start, $parameters->limit, $parameters->modifiedAfter, $parameters->ids, $parameters->projectIds),
+            APIData::TYPE_WORKERS => $this->dataAPIService->getWorkers($parameters->start, $parameters->limit, $parameters->modifiedAfter, $parameters->ids),
+            // Every caller passes an APIData::TYPE_* constant, so reaching this
+            // is a bug here rather than bad input, and is not a 400.
             default => throw new \InvalidArgumentException("Invalid type: $type"),
         };
 
         return (new ResponseData(
-            [
-                'start' => $start,
-                'limit' => $limit,
-                'modifiedAfter' => $modifiedAfter,
-                'ids' => $ids,
-                'projectIds' => $projectIds,
-            ],
+            $parameters->toArray(),
             count($results),
             $results,
         ))->toArray();

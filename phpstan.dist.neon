@@ -6,6 +6,14 @@ parameters:
     excludePaths:
         - vendor
         - node_modules
+        - phpstan
+
+    # Leantime core is not a composer dependency, so the classes and helpers the
+    # plugin borrows from its host have to be declared for analysis. Classes live
+    # in tests/Stub, which the test suite also uses; global functions cannot be
+    # autoloaded from there and are stubbed here instead.
+    scanFiles:
+        - phpstan/leantime-helpers.stub
 
 # Local Variables:
 # mode: yaml
